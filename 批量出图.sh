@@ -75,15 +75,17 @@ fi
 echo ""
 echo "== 截图 =="
 ok=0
-for f in "${PAGES[@]}"; do
-  slug="$(basename "$f" .html)"
-  png="$OUT_ABS/$slug.png"
+
+# 截一张。$1 是附加的 Chrome 参数（用来在失败时加 --no-sandbox 重试）。
+# 先截到临时文件再改名：目标文件不存在，就不会把"上一轮的旧图"误判成本轮成功；
+# 也不用先删旧图（那会触发沙箱的批量删除保护）。
+try_shot() {
+  local extra="$1"
   prof="$(mktemp -d)"
-  # 先截到临时文件再改名：目标文件不存在，就不会把"上一轮的旧图"误判成本轮成功；
-  # 也不用先删旧图（那会触发沙箱的批量删除保护）。
   tmp="$PAGE_DIR/.shot-$$-$RANDOM.png"
 
-  "$CHROME" --headless=new --disable-gpu --hide-scrollbars \
+  # shellcheck disable=SC2086
+  "$CHROME" --headless=new $extra --disable-gpu --hide-scrollbars \
     --no-first-run --no-default-browser-check --disable-extensions \
     --disable-background-timer-throttling \
     --user-data-dir="$prof" \
@@ -93,7 +95,8 @@ for f in "${PAGES[@]}"; do
     "file://$f" >/dev/null 2>&1 &
   pid=$!
 
-  # Chrome 截图后经常不退出，等到文件落盘且大小稳定就收工
+  # Chrome 截图后经常不退出，等到文件落盘且大小稳定就收工。
+  # 进程已经退场且没有产物时要立刻收工——否则一张图白等 30 秒，九张就超时。
   last=-1; stable=0
   for _ in $(seq 1 120); do
     if [ -s "$tmp" ]; then
@@ -101,6 +104,9 @@ for f in "${PAGES[@]}"; do
       if [ "$cur" = "$last" ]; then stable=$((stable + 1)); else stable=0; fi
       last="$cur"
       [ "$stable" -ge 2 ] && break
+    elif ! kill -0 "$pid" 2>/dev/null; then
+      sleep 0.4
+      break
     fi
     sleep 0.25
   done
@@ -108,6 +114,20 @@ for f in "${PAGES[@]}"; do
   kill -9 "$pid" 2>/dev/null
   wait "$pid" 2>/dev/null
   rm -rf "$prof"
+  [ -s "$tmp" ]
+}
+
+EXTRA=""   # 探到 Chrome 需要 --no-sandbox 之后记住它，后面每张直接用
+for f in "${PAGES[@]}"; do
+  slug="$(basename "$f" .html)"
+  png="$OUT_ABS/$slug.png"
+
+  if ! try_shot "$EXTRA"; then
+    # 受限环境下 Chrome 自身沙箱初始化失败（SIGTRAP、不产出截图），
+    # 退回 --no-sandbox 再来一次。渲染的都是本机自己生成的页面，没有外部输入。
+    EXTRA="--no-sandbox"
+    try_shot "$EXTRA"
+  fi
 
   if [ -s "$tmp" ]; then
     mv -f "$tmp" "$png"

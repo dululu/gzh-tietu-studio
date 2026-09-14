@@ -305,10 +305,10 @@ function contentFocus(d, top, bottom, t) {
 
 // ---- duo：双主体 + 金句 + 四宫格 ----
 function contentDuo(d, top, bottom, t) {
-  const rowH = 290, gw = (CW - 18) / 2;
-  const quoteH = d.quote ? 30 * 1.35 + 26 : 0;
-  const quadTop = top + rowH + quoteH + 30;
-  const thumbH = 148, cellGap = 16;
+  const rowH = 272, gw = (CW - 18) / 2;
+  const quoteH = d.quote ? 30 * 1.35 + 20 : 0;
+  const quadTop = top + rowH + quoteH + 24;
+  const thumbH = 142, cellGap = 16;
   const cellW = (CW - cellGap * 3) / 4;
   const quads = (d.quads || []).slice(0, 4);
 
@@ -316,7 +316,7 @@ function contentDuo(d, top, bottom, t) {
   svg += imgCard(d.img, CX, top, gw, rowH, t, '主体 A');
   svg += imgCard(d.img2, CX + gw + 18, top, gw, rowH, t, '主体 B');
   if (d.quote) {
-    svg += T({ x: W / 2, cy: top + rowH + 26 + (30 * 1.35) / 2, s: d.quote, size: 30, fill: t.title, weight: 700, family: TITLE_FONT, ls: 1 });
+    svg += T({ x: W / 2, cy: top + rowH + 20 + (30 * 1.35) / 2, s: d.quote, size: 30, fill: t.title, weight: 700, family: TITLE_FONT, ls: 1 });
   }
   const qimgs = d.quadImgs || [], qpos = d.quadPos || [];
   quads.forEach((q, i) => {
