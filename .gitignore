@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+._*
+
+# 临时产物：中间页面、总览页、截图临时文件
+.pages/
+_总览.html
+_预览.html
+*.tmp.png
+.shot-*.png
+
+# 你自己的输出目录（按需保留/忽略）
+out/
+输出/
+贴图输出/
+热点出图/
+svg输出/
+
+# 别把 key 提交上来
+.pexels-key
+*.key

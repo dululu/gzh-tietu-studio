@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>贴图模板 · 小铭想</title>
+<script src="./vendor/echarts.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #EDF1F6;
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 80px;
+  }
+
+  /* ================= 骨架：810 × 1080（精确 3:4） ================= */
+  .poster {
+    position: relative;
+    width: 810px; height: 1080px;
+    border-radius: 34px;
+    overflow: hidden;
+    background:
+      radial-gradient(78% 42% at 2% 0%,   rgba(var(--blob), var(--blob-op)) 0%, rgba(var(--blob), 0) 62%),
+      radial-gradient(78% 42% at 98% 0%,  rgba(var(--blob), calc(var(--blob-op) * .95)) 0%, rgba(var(--blob), 0) 60%),
+      radial-gradient(88% 46% at 0% 100%, rgba(var(--blob), var(--blob-op)) 0%, rgba(var(--blob), 0) 62%),
+      radial-gradient(88% 46% at 100% 100%, rgba(var(--blob), var(--blob-op)) 0%, rgba(var(--blob), 0) 60%),
+      linear-gradient(180deg, var(--bg-from) 0%, var(--bg-mid) 30%, var(--bg-mid) 68%, var(--bg-to) 100%);
+  }
+  .poster::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(46% 26% at 12% 8%,  rgba(var(--blob), calc(var(--blob-op) * .7)) 0%, rgba(var(--blob), 0) 70%),
+      radial-gradient(46% 26% at 88% 6%,  rgba(var(--blob), calc(var(--blob-op) * .64)) 0%, rgba(var(--blob), 0) 70%),
+      radial-gradient(52% 24% at 6% 94%,  rgba(var(--blob), calc(var(--blob-op) * .64)) 0%, rgba(var(--blob), 0) 70%),
+      radial-gradient(52% 24% at 94% 96%, rgba(var(--blob), calc(var(--blob-op) * .7)) 0%, rgba(var(--blob), 0) 70%);
+  }
+
+  .card {
+    position: absolute; inset: 26px;
+    background: #FFFFFF;
+    border-radius: 26px;
+    padding: 50px 50px 40px;
+    display: flex; flex-direction: column;
+  }
+
+  /* ---------- 固定件 1：右上角账号角标 ---------- */
+  .badge {
+    position: absolute; top: 0; right: 0; z-index: 9;
+    width: 88px; height: 88px;
+    background: var(--badge);
+    border-radius: 0 26px 0 16px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #FFFFFF;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-size: 25px; font-weight: 700; line-height: 1.12; letter-spacing: 1px;
+  }
+  .badge i { display: block; width: 42px; height: 1px; background: rgba(255,255,255,.5); margin: 5px 0; }
+
+  /* ---------- 固定件 2：主标题（两行 + 第二行雾带） ---------- */
+  .title {
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+    font-weight: 900; line-height: 1.22; color: var(--title);
+    display: flex; flex-direction: column; align-items: center;
+    flex: none;
+  }
+  .title .t1 { display: inline-block; white-space: nowrap; font-size: 72px; letter-spacing: 4px; text-indent: 4px; }
+  .title .hl-line { position: relative; display: block; width: 100%; text-align: center; }
+  .title .t2 { position: relative; z-index: 1; display: inline-block; white-space: nowrap; font-size: 58px; letter-spacing: 2px; text-indent: 2px; }
+  .title .hl-line::before {
+    content: ""; position: absolute; z-index: 0;
+    left: -50px; right: -50px; top: 6%; height: 88%;
+    background: linear-gradient(90deg,
+      rgba(var(--mist), 0) 0%, rgba(var(--mist), .9) 14%,
+      rgba(var(--mist), .9) 86%, rgba(var(--mist), 0) 100%);
+  }
+
+  /* ---------- 固定件 3：副标题（可选） ---------- */
+  .deck {
+    flex: none; text-align: center;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 32px; letter-spacing: 2px; color: var(--title);
+    margin-top: 26px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--soft-line);
+  }
+  .deck.empty { display: none; }
+
+  /* ---------- 可换件：内容区 ---------- */
+  .content { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 26px; }
+
+  .placeholder {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: linear-gradient(160deg, var(--thumb-from) 0%, var(--thumb-to) 100%);
+    border: 2px dashed var(--soft-line); border-radius: 14px;
+    color: var(--thumb-text); font-size: 20px; text-align: center; line-height: 1.6;
+  }
+  .placeholder span { font-size: 14px; opacity: .75; }
+
+  /* ===== 版式 photo：单图 + 图注 ===== */
+  .ly-photo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-photo .ph-img { flex: 1; min-height: 0; width: 100%; object-fit: cover; border-radius: 14px; }
+  .ly-photo .ph-cap {
+    flex: none; margin-top: 22px; text-align: center;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 25px; color: var(--title); letter-spacing: 1px;
+  }
+
+  /* ===== 版式 photoFocus：主图 + 圆形焦点 ===== */
+  .ly-focus { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-focus .stage { position: relative; flex: 1; min-height: 0; }
+  .ly-focus .stage > img,
+  .ly-focus .stage > .placeholder { width: 100%; height: 100%; border-radius: 14px; object-fit: cover; }
+  .ly-focus .lens {
+    position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
+    width: 480px; height: 480px; border-radius: 50%;
+    background: #FFFFFF; border: 5px solid var(--title);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  }
+  .ly-focus .lens::after { content: ""; position: absolute; inset: -16px; border-radius: 50%; border: 3px solid rgba(0,0,0,.18); }
+  .ly-focus .pill {
+    padding: 12px 30px; border-radius: 999px;
+    background: linear-gradient(180deg, var(--pill-from) 0%, var(--pill-to) 100%);
+    border: 4px solid var(--pill-border);
+    color: #FFFFFF; font-weight: 700; font-size: 34px; letter-spacing: 1px; white-space: nowrap;
+  }
+  .ly-focus .cap { position: relative; z-index: 2; flex: none; margin-top: 18px; font-size: 16px; color: var(--foot); }
+
+  /* ===== 版式 duo：双主体 + 金句 + 四宫格 ===== */
+  .ly-duo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-duo .duo-row { flex: none; display: flex; gap: 18px; align-items: flex-end; }
+  .ly-duo .duo-row > * { flex: 1; min-width: 0; height: 290px; border-radius: 14px; object-fit: cover; object-position: top center; }
+  .ly-duo .quote {
+    flex: none; margin-top: 26px; text-align: center;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 30px; color: var(--title); letter-spacing: 1px;
+  }
+  .ly-duo .quad { flex: none; margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .ly-duo .cell { display: flex; flex-direction: column; gap: 12px; }
+  .ly-duo .cell .thumb {
+    height: 148px; border-radius: 12px; overflow: hidden;
+    background: linear-gradient(160deg, var(--thumb-from) 0%, var(--thumb-to) 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ly-duo .cell .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .ly-duo .cell .thumb span { font-size: 34px; font-weight: 700; color: var(--thumb-text); }
+  /* 四宫格放图时：给个内描边，白底照片不会糊在卡片里；图挂了就显式报错，别静默留白 */
+  .ly-duo .cell .thumb.imgbox { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .07); }
+  .ly-duo .cell .thumb.miss {
+    background: #FFFFFF; border: 2px dashed var(--soft-line); box-shadow: none;
+  }
+  .ly-duo .cell .thumb.miss::after { content: "缺图"; font-size: 15px; color: var(--foot); }
+  .ly-duo .cell p { text-align: center; font-size: 19px; font-weight: 500; color: var(--title); line-height: 1.35; }
+
+  /* ===== 版式 chart：双轴柱线图 ===== */
+  .ly-chart { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-chart .ctitle { flex: none; font-weight: 700; font-size: 27px; color: var(--ink); letter-spacing: .5px; }
+  .ly-chart .legend { flex: none; display: flex; justify-content: center; gap: 44px; margin-top: 22px; font-size: 18px; color: var(--axis); }
+  .ly-chart .legend span { display: flex; align-items: center; gap: 10px; }
+  .ly-chart .sq { width: 24px; height: 14px; border-radius: 2px; background: var(--card); }
+  .ly-chart .ln { position: relative; width: 26px; height: 14px; }
+  .ly-chart .ln::before { content: ""; position: absolute; left: 0; right: 0; top: 6px; height: 3px; background: var(--line); }
+  .ly-chart .ln::after { content: ""; position: absolute; left: 9px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .ly-chart .chartbox { flex: 1; min-height: 0; margin-top: 8px; }
+
+  /* ===== 版式 bar：横向条形 + 数字对比卡 ===== */
+  .ly-bar { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-bar .ctitle { flex: none; text-align: center; font-weight: 700; font-size: 27px; color: var(--ink); }
+  .ly-bar .stage { flex: 1; min-height: 0; margin-top: 14px; display: flex; align-items: center; gap: 20px; }
+  .ly-bar .chartbox { position: relative; flex: 1; min-width: 0; height: 100%; }
+  .ly-bar .compare {
+    flex: none; width: 296px; background: #FFFFFF; border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.16);
+    padding: 22px 22px 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .ly-bar .compare .lead { font-size: 21px; font-weight: 700; color: var(--title); line-height: 1.45; text-align: center; }
+  .ly-bar .compare .big {
+    width: 100%; background: var(--card); border-radius: 10px;
+    padding: 12px 0; text-align: center; white-space: nowrap;
+    color: #FFFFFF; font-size: 40px; font-weight: 700; letter-spacing: 1px;
+  }
+  .ly-bar .compare .vs {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--card); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700;
+  }
+
+  /* ===== 版式 stat：单数字冲击 ===== */
+  .ly-stat { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .stat-main { display: flex; align-items: baseline; white-space: nowrap; }
+  .stat-val { font-size: 170px; font-weight: 700; line-height: 1; letter-spacing: -5px; color: var(--title); }
+  .stat-unit { font-size: 62px; font-weight: 700; color: var(--title); margin-left: 12px; }
+  .stat-label {
+    width: 100%; margin-top: 30px; text-align: center;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 30px; color: var(--axis); letter-spacing: 1px;
+  }
+  .stat-subs { margin-top: 52px; width: 100%; display: flex; flex-direction: column; gap: 16px; }
+  .stat-subs .sub {
+    background: var(--soft); border-left: 6px solid var(--card); border-radius: 8px;
+    padding: 15px 24px; font-size: 22px; color: var(--axis); line-height: 1.5;
+  }
+
+  /* ===== 版式 list：编号清单 ===== */
+  .ly-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-list .list-title {
+    flex: none; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 32px; color: var(--title);
+  }
+  .ly-list .list-items { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; gap: 18px; margin-top: 16px; }
+  .ly-list .li {
+    display: flex; gap: 18px; align-items: center;
+    background: var(--soft); border-left: 6px solid var(--card);
+    border-radius: 4px 14px 14px 4px; padding: 20px 24px 20px 20px;
+  }
+  .ly-list .li .idx {
+    flex: none; width: 46px; height: 46px; border-radius: 13px;
+    background: var(--card); color: #fff;
+    font-size: 24px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ly-list .li h4 { font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-weight: 700; font-size: 28px; color: var(--title); line-height: 1.3; }
+  .ly-list .li p { margin-top: 8px; font-size: 20px; color: var(--axis); line-height: 1.5; }
+
+  /* ===== 版式 compare：左右对比 ===== */
+  .ly-cmp { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-cmp .cmp-title {
+    flex: none; text-align: center;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 32px; color: var(--title);
+  }
+  .ly-cmp .cmp-cols { flex: 1; min-height: 0; display: flex; gap: 16px; margin-top: 30px; }
+  .ly-cmp .col { flex: 1; min-width: 0; border-radius: 16px; padding: 28px 24px; display: flex; flex-direction: column; }
+  .ly-cmp .col.l { background: #fff; border: 2px solid var(--soft-line); }
+  .ly-cmp .col.r { background: var(--card); }
+  .ly-cmp .col h5 {
+    flex: none; padding-bottom: 16px;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-weight: 700; font-size: 27px;
+  }
+  .ly-cmp .col.l h5 { color: var(--title); border-bottom: 2px solid var(--soft-line); }
+  .ly-cmp .col.r h5 { color: #fff; border-bottom: 2px solid rgba(255,255,255,.32); }
+  .ly-cmp .col ul { flex: 1; min-height: 0; margin-top: 18px; list-style: none; display: flex; flex-direction: column; justify-content: space-evenly; gap: 12px; }
+  .ly-cmp .col li { position: relative; padding-left: 24px; font-size: 20px; line-height: 1.5; }
+  .ly-cmp .col li::before { content: ""; position: absolute; left: 0; top: 13px; width: 9px; height: 9px; border-radius: 50%; }
+  .ly-cmp .col.l li { color: var(--axis); }
+  .ly-cmp .col.l li::before { background: var(--card); }
+  .ly-cmp .col.r li { color: rgba(255,255,255,.92); }
+  .ly-cmp .col.r li::before { background: rgba(255,255,255,.55); }
+
+  /* ===== 版式 timeline：时间轴 ===== */
+  .ly-tl { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-tl .tl-title {
+    flex: none; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 32px; color: var(--title);
+  }
+  .ly-tl .tl-items { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; margin-top: 16px; }
+  .ly-tl .tl-items::before {
+    content: ""; position: absolute; left: 121px; top: 26px; bottom: 26px;
+    width: 2px; background: var(--soft-line);
+  }
+  .ly-tl .tl-item { display: flex; gap: 18px; align-items: flex-start; padding: 14px 0; }
+  .ly-tl .tl-time { flex: none; width: 86px; text-align: right; font-size: 25px; font-weight: 700; color: var(--card); line-height: 32px; }
+  .ly-tl .tl-dotcol { flex: none; width: 36px; display: flex; justify-content: center; padding-top: 8px; }
+  .ly-tl .dot { position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: var(--card); border: 3px solid #fff; }
+  .ly-tl .tl-text { flex: 1; min-width: 0; }
+  .ly-tl .tl-text b { font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-size: 26px; font-weight: 700; color: var(--title); }
+  .ly-tl .tl-text p { margin-top: 6px; font-size: 19px; color: var(--axis); line-height: 1.5; }
+
+  /* ---------- 固定件 4：底部来源 ---------- */
+  .footnote { flex: none; margin-top: 18px; font-size: 16px; line-height: 1.8; color: var(--foot); }
+  .footnote.empty { display: none; }
+
+  /* ---------- 操作区（不参与导出） ---------- */
+  .toolbar { width: 810px; margin-top: 26px; background: #fff; border-radius: 14px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(16,24,40,.06); }
+  .toolbar h3 { font-size: 15px; font-weight: 600; color: #101828; margin-bottom: 12px; }
+  .toolbar textarea {
+    width: 100%; height: 230px; resize: vertical;
+    font-family: "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.6;
+    padding: 12px 14px; border: 1px solid #D6DEE8; border-radius: 10px;
+    color: #101828; background: #FAFCFE; outline: none;
+  }
+  .toolbar textarea:focus { border-color: #7FB4E8; }
+  .row { display: flex; gap: 12px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+  button { font-family: inherit; font-size: 14px; font-weight: 500; padding: 10px 20px; border-radius: 9px; cursor: pointer; border: 1px solid #CFDAE6; background: #fff; color: #1D2939; }
+  button:hover { background: #F4F8FC; }
+  button.primary { background: #16365C; border-color: #16365C; color: #fff; }
+  button.primary:hover { background: #1D4C7E; }
+  .tip { font-size: 13px; color: #7A8798; }
+  select { font-family: inherit; font-size: 14px; padding: 9px 12px; border-radius: 9px; border: 1px solid #CFDAE6; background: #fff; color: #1D2939; }
+  .swatches { display: flex; gap: 7px; align-items: center; }
+  .sw { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0,0,0,.12); }
+</style>
+</head>
+<body>
+
+<div class="poster" id="poster">
+  <div class="badge" id="badgeBox"></div>
+  <div class="card">
+    <div class="title">
+      <span class="t1" id="t1"></span>
+      <span class="hl-line"><span class="t2" id="t2"></span></span>
+    </div>
+    <div class="deck" id="deck"></div>
+    <div class="content" id="content"></div>
+    <div class="footnote" id="footnote"></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <h3>数据源</h3>
+  <textarea id="dataBox"></textarea>
+  <div class="row">
+    <select id="layoutPick">
+      <option value="chart">双轴柱线图</option>
+      <option value="stat">单数字冲击</option>
+      <option value="list">编号清单</option>
+      <option value="compare">左右对比</option>
+      <option value="timeline">时间轴</option>
+      <option value="bar">横向条形 + 数字卡</option>
+      <option value="photo">单图 + 图注</option>
+      <option value="photoFocus">主图 + 圆形焦点</option>
+      <option value="duo">双主体 + 金句 + 四宫格</option>
+    </select>
+    <select id="themePick"></select>
+    <span class="swatches" id="swatches"></span>
+    <button class="primary" onclick="render()">重新渲染</button>
+    <button onclick="downloadPNG()">下载 PNG（2 倍图）</button>
+  </div>
+  <div class="row"><span class="tip">切换版式或配色会自动改写数据里的 layout / theme 字段</span></div>
+</div>
+
+<script src="./主题.js"></script>
+<script>
+/* 主题.js 加载失败就明确报错，否则整个脚本会静默挂掉、只剩一张白卡 */
+if (typeof THEMES === 'undefined') {
+  document.body.innerHTML = '<div style="margin:60px auto;max-width:560px;padding:28px 32px;'
+    + 'border:2px solid #C0392B;border-radius:12px;background:#FFF6F5;'
+    + 'font:16px/1.7 -apple-system,PingFang SC,sans-serif;color:#7A1F1B">'
+    + '<b>主题.js 没加载成功</b><br>'
+    + '确认 主题.js 和 贴图模板.html 在同一目录，然后刷新页面。</div>';
+  throw new Error('THEMES missing');
+}
+
+const THEME_KEYS = Object.keys(THEMES);
+const DEFAULT_THEME = 'blue';
+
+/* ============ 内容区版式 ============ */
+function ph(src, cls, hint) {
+  return src
+    ? `<img class="${cls}" src="${src}" alt="">`
+    : `<div class="${cls} placeholder">${hint || '在此放图'}<br><span>img 字段填图片本地路径或网址</span></div>`;
+}
+
+const LAYOUTS = {
+  photo: d => `<div class="ly-photo">
+      ${ph(d.img, 'ph-img')}
+      <div class="ph-cap">${d.cap || ''}</div>
+    </div>`,
+
+  photoFocus: d => `<div class="ly-focus">
+      <div class="stage">
+        ${ph(d.img, '', '在此放主图（现场 / 截图 / 车间）')}
+        <div class="lens">${(d.pills || []).map(p => `<div class="pill">${p}</div>`).join('')}</div>
+      </div>
+      <div class="cap">${d.cap || ''}</div>
+    </div>`,
+
+  duo: d => {
+    const quads = d.quads || [];
+    const qimgs = d.quadImgs || [];
+    const qpos = d.quadPos || [];
+    // 四宫格给了图就用图（图 + 标签），没给就退回"首字大卡"的老样式
+    const anyImg = quads.some((_, i) => qimgs[i]);
+    return `<div class="ly-duo${anyImg ? ' has-qimg' : ''}">
+      <div class="duo-row">${ph(d.img, '', '主体 A')}${ph(d.img2, '', '主体 B')}</div>
+      <div class="quote" id="duoQuote">${d.quote || ''}</div>
+      <div class="quad">${quads.map((q, i) => {
+        const im = qimgs[i];
+        // 小方块是正方形，横图两侧会被裁掉；quadPos 用来把主体挪进画面（如 "72% center"）
+        const pos = qpos[i] ? ` style="object-position:${qpos[i]}"` : '';
+        return `<div class="cell">${im
+          ? `<div class="thumb imgbox"><img src="${im}" alt=""${pos} onerror="var p=this.parentNode;this.remove();p.classList.add('miss')"></div>`
+          : `<div class="thumb"><span>${String(q).slice(0, 1)}</span></div>`
+        }<p class="quad-label">${q}</p></div>`;
+      }).join('')}</div>
+    </div>`;
+  },
+
+  chart: d => `<div class="ly-chart">
+      <div class="ctitle">${d.chartTitle || ''}</div>
+      <div class="legend">
+        <span><i class="sq"></i>${d.legendBar || ''}</span>
+        <span><i class="ln"></i>${d.legendLine || ''}</span>
+      </div>
+      <div class="chartbox" id="chartBox"></div>
+    </div>`,
+
+  bar: d => `<div class="ly-bar">
+      <div class="ctitle">${d.barTitle || ''}</div>
+      <div class="stage">
+        <div class="chartbox" id="chartBox"></div>
+        <div class="compare">
+          <div class="lead">${(d.compareLead || '').replace(/\n/g, '<br>')}</div>
+          <div class="big">${d.compareA || ''}</div>
+          <div class="vs">${d.compareMid || 'V'}</div>
+          <div class="lead">${(d.compareLead2 || '').replace(/\n/g, '<br>')}</div>
+          <div class="big">${d.compareB || ''}</div>
+        </div>
+      </div>
+    </div>`,
+
+  stat: d => `<div class="ly-stat">
+      <div class="stat-main">
+        <span class="stat-val" id="statVal">${d.statValue || ''}</span>
+        <span class="stat-unit">${d.statUnit || ''}</span>
+      </div>
+      <div class="stat-label" id="statLabel">${d.statLabel || ''}</div>
+      <div class="stat-subs">${(d.statSubs || []).map(s => `<div class="sub">${s}</div>`).join('')}</div>
+    </div>`,
+
+  list: d => `<div class="ly-list">
+      <div class="list-title">${d.listTitle || ''}</div>
+      <div class="list-items">${(d.listItems || []).map((it, i) => `
+        <div class="li">
+          <span class="idx">${i + 1}</span>
+          <div><h4>${it.h || ''}</h4><p>${it.p || ''}</p></div>
+        </div>`).join('')}</div>
+    </div>`,
+
+  compare: d => `<div class="ly-cmp">
+      <div class="cmp-title">${d.cmpTitle || ''}</div>
+      <div class="cmp-cols">
+        <div class="col l">
+          <h5>${d.cmpLeftTitle || ''}</h5>
+          <ul>${(d.cmpLeftItems || []).map(s => `<li>${s}</li>`).join('')}</ul>
+        </div>
+        <div class="col r">
+          <h5>${d.cmpRightTitle || ''}</h5>
+          <ul>${(d.cmpRightItems || []).map(s => `<li>${s}</li>`).join('')}</ul>
+        </div>
+      </div>
+    </div>`,
+
+  timeline: d => `<div class="ly-tl">
+      <div class="tl-title">${d.tlTitle || ''}</div>
+      <div class="tl-items">${(d.tlItems || []).map(it => `
+        <div class="tl-item">
+          <div class="tl-time">${it.t || ''}</div>
+          <div class="tl-dotcol"><span class="dot"></span></div>
+          <div class="tl-text"><b>${it.h || ''}</b><p>${it.p || ''}</p></div>
+        </div>`).join('')}</div>
+    </div>`
+};
+
+/* ============ 主题 ============ */
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES[DEFAULT_THEME];
+  const p = document.getElementById('poster');
+  const map = {
+    '--bg-from': t.bgFrom, '--bg-mid': t.bgMid, '--bg-to': t.bgTo,
+    '--blob': t.blobRgb, '--blob-op': t.blobOp,
+    '--badge': t.badge, '--title': t.title, '--mist': t.mistRgb,
+    '--card': t.card, '--card-deep': t.cardDeep,
+    '--pill-from': t.pillFrom, '--pill-to': t.pillTo, '--pill-border': t.pillBorder,
+    '--thumb-from': t.thumbFrom, '--thumb-to': t.thumbTo, '--thumb-text': t.thumbText,
+    '--soft': t.soft, '--soft-line': t.softLine,
+    '--axis': t.axis, '--ink': t.ink, '--foot': t.foot,
+    '--grid': t.grid, '--split': t.split, '--x-label': t.xLabel,
+    '--line': t.line
+  };
+  Object.keys(map).forEach(k => p.style.setProperty(k, map[k]));
+  return t;
+}
+
+/* ============ 图表 ============ */
+let chartInst = null, chartHost = null;
+function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
+
+function initChart(d, t) {
+  const last = d.highlight == null ? d.counts.length - 1 : d.highlight;
+  chartInst = echarts.init(chartHost, null, { renderer: 'canvas' });
+  chartInst.setOption({
+    animation: false,
+    textStyle: { fontFamily: '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif' },
+    grid: { left: 66, right: 84, top: 52, bottom: 30 },
+    xAxis: {
+      type: 'category', data: d.years,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: t.softLine } },
+      axisLabel: {
+        interval: 0, margin: 14, fontSize: 16, color: t.xLabel,
+        formatter: v => v === d.years[last] ? '{hl|' + v + '}' : v,
+        rich: { hl: { color: t.hlStroke, fontWeight: 'bold', fontSize: 16 } }
+      }
+    },
+    yAxis: [
+      { type: 'value', min: 0, max: d.countAxisMax, interval: d.countAxisMax / 4,
+        name: d.countUnit,
+        nameTextStyle: { color: t.axis, fontSize: 15, align: 'right', padding: [0, 6, 6, 0] },
+        splitLine: { lineStyle: { color: t.grid } },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: t.axis, fontSize: 15, formatter: fmtInt } },
+      { type: 'value', min: 0, max: d.wealthAxisMax, interval: d.wealthAxisMax / 4,
+        name: d.wealthUnit,
+        nameTextStyle: { color: t.axis, fontSize: 15, align: 'left', padding: [0, 0, 6, 6] },
+        splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: t.axis, fontSize: 15, formatter: v => '$' + v + 'tn' } }
+    ],
+    series: [
+      { type: 'bar', barWidth: '48%', z: 2,
+        data: d.counts.map((v, i) => i === last
+          ? { value: v, itemStyle: { color: t.hlFill, borderColor: t.hlStroke, borderWidth: 3, borderRadius: 0 } }
+          : v),
+        itemStyle: { borderRadius: [2, 2, 0, 0],
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [{ offset: 0, color: t.barTop }, { offset: 1, color: t.barBot }] } },
+        label: { show: true, position: 'top', distance: 9, fontSize: 16, fontWeight: 'bold', color: t.ink,
+          formatter: p => p.dataIndex === last ? '{hl|' + fmtInt(p.value) + '}' : fmtInt(p.value),
+          rich: { hl: { color: t.hlStroke, fontWeight: 'bold', fontSize: 16 } } } },
+      { type: 'line', yAxisIndex: 1, z: 5, symbol: 'circle', symbolSize: 11, data: d.wealth,
+        lineStyle: { color: t.line, width: 3 },
+        itemStyle: { color: t.line, borderColor: '#FFFFFF', borderWidth: 2 },
+        label: { show: true, position: 'top', distance: 11, fontSize: 16, fontWeight: 'bold', color: t.line,
+          formatter: p => '$' + Number(p.value).toFixed(1) + 'tn' } }
+    ]
+  });
+}
+
+function initBar(d, t) {
+  const labels = (d.barLabels || []).slice().reverse();
+  const values = (d.barValues || []).slice().reverse();
+  chartInst = echarts.init(chartHost, null, { renderer: 'canvas' });
+  chartInst.setOption({
+    animation: false,
+    textStyle: { fontFamily: '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif' },
+    grid: { left: 74, right: 30, top: 34, bottom: 26 },
+    xAxis: {
+      type: 'value', position: 'top',
+      splitLine: { lineStyle: { color: t.split } },
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: t.axis, fontSize: 14 }
+    },
+    yAxis: {
+      type: 'category', data: labels,
+      axisTick: { show: false }, axisLine: { show: false },
+      axisLabel: { color: t.axis, fontSize: 14, interval: 0, margin: 12 }
+    },
+    series: [{ type: 'bar', barWidth: '62%', data: values, itemStyle: { color: t.bar2, borderRadius: 1 } }]
+  });
+}
+
+/* ============ 渲染 ============ */
+/* 量文本本身的宽度。不能用 scrollWidth —— 居中的 nowrap 文本向两边溢出，
+   scrollWidth 只统计行尾那一侧，会误判成"放得下"。 */
+function measureText(el) {
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  const w = r.getBoundingClientRect().width;
+  return w > 0 ? w : el.scrollWidth;
+}
+
+function fitText(el, max, min) {
+  if (!el) return;
+  const floor = min == null ? 24 : min;
+  const avail = el.parentElement.clientWidth || 658;
+  // 先按单行排，缩到下限还放不下再放开换行
+  el.style.whiteSpace = 'nowrap';
+  let s = max;
+  el.style.fontSize = s + 'px';
+  while (measureText(el) > avail && s > floor) { s -= 1; el.style.fontSize = s + 'px'; }
+  if (measureText(el) > avail) el.style.whiteSpace = '';
+}
+
+function render(injected) {
+  let d;
+  if (injected) d = injected;
+  else {
+    try { d = JSON.parse(document.getElementById('dataBox').value); }
+    catch (e) { alert('JSON 格式有误：' + e.message); return; }
+  }
+
+  if (chartInst) { chartInst.dispose(); chartInst = null; }
+  chartHost = null;
+
+  const themeName = THEMES[d.theme] ? d.theme : DEFAULT_THEME;
+  const t = applyTheme(themeName);
+
+  const bs = String(d.badge || '小铭想');
+  const bb = document.getElementById('badgeBox');
+  // 第一字单独一行，剩下的字放第二行（角标只有 88px 宽，字数多就缩字号）
+  bb.innerHTML = (bs.slice(0, 1) || '') + '<i></i>' + (bs.slice(1) || '');
+  bb.style.fontSize = bs.length <= 2 ? '27px' : bs.length === 3 ? '25px' : '18px';
+
+  document.getElementById('t1').textContent = d.title1 || '';
+  document.getElementById('t2').textContent = d.title2 || '';
+  fitText(document.getElementById('t1'), 72);
+  fitText(document.getElementById('t2'), 58);
+
+  const deck = document.getElementById('deck');
+  deck.textContent = d.deck || '';
+  deck.classList.toggle('empty', !d.deck);
+  if (d.deck) fitText(deck, 32, 22);
+
+  const fn = document.getElementById('footnote');
+  fn.innerHTML = (d.foot || []).join('<br>');
+  fn.classList.toggle('empty', !(d.foot || []).length);
+
+  const content = document.getElementById('content');
+  content.innerHTML = (LAYOUTS[d.layout] || LAYOUTS.photo)(d);
+  fitText(document.getElementById('statVal'), 170);
+  fitText(document.getElementById('statLabel'), 30, 20);
+  fitText(document.getElementById('duoQuote'), 30, 22);
+  // 四宫格标签长度不一，逐个缩到单行，不然长的折两行、四个格子高低不齐
+  content.querySelectorAll('.quad-label').forEach(el => fitText(el, 19, 13));
+
+  chartHost = document.getElementById('chartBox');
+  if (chartHost) {
+    if (typeof echarts === 'undefined') {
+      chartHost.innerHTML = '<div style="align-self:center;padding:24px;border:2px dashed #C0392B;'
+        + 'border-radius:12px;color:#7A1F1B;font-size:18px;line-height:1.7">'
+        + 'ECharts 没加载成功<br>确认 vendor/echarts.min.js 存在</div>';
+    } else if (d.layout === 'chart') initChart(d, t);
+    else if (d.layout === 'bar') initBar(d, t);
+  }
+
+  document.getElementById('layoutPick').value = d.layout || 'photo';
+  document.getElementById('themePick').value = themeName;
+  document.getElementById('swatches').innerHTML = ['badge', 'title', 'barBot', 'line', 'hlStroke']
+    .map(k => '<span class="sw" style="background:' + t[k] + '" title="' + k + '"></span>').join('');
+}
+
+function downloadPNG() {
+  const poster = document.getElementById('poster');
+  const bar = document.querySelector('.toolbar');
+  bar.style.visibility = 'hidden';
+  html2canvas(poster, { scale: 2, useCORS: true, backgroundColor: null,
+    width: poster.offsetWidth, height: poster.offsetHeight })
+    .then(c => {
+      bar.style.visibility = '';
+      const a = document.createElement('a');
+      a.download = '贴图_' + Date.now() + '.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    })
+    .catch(e => { bar.style.visibility = ''; alert('导出失败：' + e.message); });
+}
+
+/* ============ 默认数据 ============ */
+const DEFAULT_DATA = {
+  layout: 'chart', theme: 'blue', badge: '小铭想',
+  title1: '全球财富大洗牌',
+  title2: '谁在 AI 时代疯狂造富？',
+  deck: '全球富豪人数与财富总额创新高',
+  foot: ['注:富豪定义为个人净资产超过10亿美元', '数据来源:Altrata,2026'],
+
+  chartTitle: '2016-2025年全球富豪人数及财富总额变化',
+  legendBar: '富豪人数（位）', legendLine: '财富总额（万亿美元）',
+  years: ['2016','2017','2018','2019','2020','2021','2022','2023','2024','2025'],
+  counts: [2397, 2754, 2604, 2825, 3204, 3311, 3194, 3323, 3508, 3795],
+  wealth: [7.4, 9.2, 8.6, 9.4, 10.0, 11.8, 11.1, 12.1, 13.4, 15.1],
+  highlight: 9, countAxisMax: 4000, wealthAxisMax: 20,
+  countUnit: '(人数)', wealthUnit: '(万亿美元)',
+
+  img: '', img2: '', cap: '王兴兴和他的投资人们',
+  pills: ['20000-40000元/月', '25000-35000元/月'],
+  quote: '他们布局的，是新周期的“水电煤”',
+  quads: ['脑机科学与技术', '半导体工艺与装备', '具身智能', '海洋智能与无人技术'],
+  // 四宫格也可以直接放图；quadPos 用来调每张图的裁切位置（正方形格子会裁掉横图两侧）
+  quadImgs: ['img/Brain-computer_interface_experiment.jpg', 'img/Semiconductor_Wafer_of_Microelectronics.jpg',
+             'img/TOPIO_3_3.jpg', 'img/RoboSub_AUV.jpg'],
+  quadPos: ['12% center', 'center', 'center', '72% center'],
+
+  barTitle: '2001-2025 年中国博士毕业生数量',
+  barLabels: ['2001','2002','2003','2004','2005','2006','2007','2008','2009','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025'],
+  barValues: [1.2,1.4,1.9,2.4,2.8,3.6,4.2,4.4,4.9,4.9,5.0,5.2,5.3,5.4,5.4,5.5,5.8,6.1,6.3,6.6,7.0,8.2,8.7,9.7,10.8],
+  compareLead: '2001-2025年\n中国毕业博士生数量', compareA: '133.31 万',
+  compareMid: 'V', compareLead2: '中国驴存栏量跌破', compareB: '120 万',
+
+  statValue: '133.31', statUnit: '万',
+  statLabel: '2025 年中国博士毕业生数量',
+  statSubs: ['十年翻了近一倍，2015 年只有 5.4 万', '同年全国高考报名人数 1335 万'],
+
+  listTitle: '三个信号说明什么',
+  listItems: [
+    { h: '学历在贬值', p: '供给端快速扩容，博士不再是稀缺资源' },
+    { h: '岗位没跟上', p: '高校教职增速远低于毕业生增速' },
+    { h: '选择要前置', p: '读博前先想清楚出口，别只为学历' }
+  ],
+
+  cmpTitle: '同一份分数，两条路',
+  cmpLeftTitle: '省内普通院校',
+  cmpLeftItems: ['离家近，生活成本低', '实习资源集中在本地', '考研保研竞争相对缓和', '校友圈层地域性强'],
+  cmpRightTitle: '外省 211',
+  cmpRightItems: ['平台与师资更厚', '校招企业层级更高', '跨省读研出国通道更宽', '四年生活成本明显更高'],
+
+  tlTitle: '高考改革关键节点',
+  tlItems: [
+    { t: '2014', h: '新高考启动', p: '浙江、上海率先试点，取消文理分科' },
+    { t: '2017', h: '首批落地', p: '3+3 模式首次进入实际录取' },
+    { t: '2021', h: '3+1+2 扩围', p: '更多省份加入，物理与历史成首选科目' },
+    { t: '2025', h: '基本全覆盖', p: '绝大多数省份完成新高考切换' }
+  ]
+};
+
+/* ============ 启动 ============ */
+THEME_KEYS.forEach(k => {
+  const o = document.createElement('option');
+  o.value = k; o.textContent = THEMES[k].label;
+  document.getElementById('themePick').appendChild(o);
+});
+
+function onPick(key, val) {
+  let d;
+  try { d = JSON.parse(document.getElementById('dataBox').value); }
+  catch (e) { return; }
+  d[key] = val;
+  document.getElementById('dataBox').value = JSON.stringify(d, null, 2);
+  render();
+}
+document.getElementById('layoutPick').addEventListener('change', e => onPick('layout', e.target.value));
+document.getElementById('themePick').addEventListener('change', e => onPick('theme', e.target.value));
+
+const BATCH = !!window.__BATCH__;
+const DATA_IN = window.__INJECTED_DATA__ || DEFAULT_DATA;
+
+if (BATCH) {
+  const tb = document.querySelector('.toolbar');
+  if (tb) tb.style.display = 'none';
+  document.body.style.padding = '0';
+  document.body.style.background = 'transparent';
+}
+
+document.getElementById('dataBox').value = JSON.stringify(DATA_IN, null, 2);
+render(DATA_IN);
+window.addEventListener('resize', () => chartInst && chartInst.resize());
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</body>
+</html>
