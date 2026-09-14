@@ -336,6 +336,10 @@ function contentChart(d, top, bottom, t) {
   const gx = CX + 66, gw = CW - 66 - 84;
   const gy = top + 52, gh = bottom - top - 52 - 30;
   const last = d.highlight == null ? d.counts.length - 1 : d.highlight;
+  // 与 贴图模板.html 的 initChart 保持一致：右轴格式可配，默认沿用旧的金额写法
+  const wAxisFmt = d.wealthAxisFormat || '${v}tn';
+  const wLabelFmt = d.wealthLabelFormat || '${v}tn';
+  const wDec = d.wealthDecimals == null ? 1 : d.wealthDecimals;
   const lMax = d.countAxisMax, lStep = lMax / 4;
   const rMax = d.wealthAxisMax, rStep = rMax / 4;
   const n = d.years.length, band = gw / n, barW = band * 0.48;
@@ -358,7 +362,7 @@ function contentChart(d, top, bottom, t) {
     const y = gy + gh - ((lStep * i) / lMax) * gh;
     svg += line(gx, y, gx + gw, y, t.grid, 1)
       + T({ x: gx - 10, cy: y, s: (lStep * i).toLocaleString('en-US'), size: 15, fill: t.axis, anchor: 'end' })
-      + T({ x: gx + gw + 14, cy: y, s: '$' + (rStep * i) + 'tn', size: 15, fill: t.axis, anchor: 'start' });
+      + T({ x: gx + gw + 14, cy: y, s: wAxisFmt.replace('{v}', (rStep * i).toLocaleString('en-US')), size: 15, fill: t.axis, anchor: 'start' });
   }
   svg += T({ x: gx - 10, cy: gy - 30, s: d.countUnit, size: 15, fill: t.axis, anchor: 'end' })
     + T({ x: gx + gw + 14, cy: gy - 30, s: d.wealthUnit, size: 15, fill: t.axis, anchor: 'start' })
@@ -377,8 +381,12 @@ function contentChart(d, top, bottom, t) {
   svg += `<g id="折线series">`
     + `<polyline points="${pts.map(p => R(p[0]) + ',' + R(p[1])).join(' ')}" fill="none" stroke="${t.line}" stroke-width="3"/>`;
   pts.forEach((p, i) => {
+    // 折线上的数字落在柱子身上，垫一层白底才读得清（与 HTML 侧一致）
+    const s = wLabelFmt.replace('{v}', Number(d.wealth[i]).toFixed(wDec));
+    const chipW = textW(s, 16) + 12;
     svg += `<circle cx="${R(p[0])}" cy="${R(p[1])}" r="5.5" fill="${t.line}" stroke="#FFFFFF" stroke-width="2"/>`
-      + T({ x: p[0], cy: p[1] - 19, s: '$' + Number(d.wealth[i]).toFixed(1) + 'tn', size: 16, fill: t.line, weight: 700 });
+      + rect(p[0] - chipW / 2, p[1] - 31, chipW, 24, '#FFFFFF', { rx: 5 })
+      + T({ x: p[0], cy: p[1] - 19, s, size: 16, fill: t.line, weight: 700 });
   });
   svg += `</g><g id="横轴">`;
   d.years.forEach((y, i) => {

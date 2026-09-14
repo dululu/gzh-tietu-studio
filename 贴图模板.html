@@ -258,7 +258,7 @@
     width: 2px; background: var(--soft-line);
   }
   .ly-tl .tl-item { display: flex; gap: 18px; align-items: flex-start; padding: 14px 0; }
-  .ly-tl .tl-time { flex: none; width: 86px; text-align: right; font-size: 25px; font-weight: 700; color: var(--card); line-height: 32px; }
+  .ly-tl .tl-time { flex: none; width: 86px; text-align: right; font-size: 25px; font-weight: 700; color: var(--card); line-height: 32px; white-space: nowrap; }
   .ly-tl .tl-dotcol { flex: none; width: 36px; display: flex; justify-content: center; padding-top: 8px; }
   .ly-tl .dot { position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 50%; background: var(--card); border: 3px solid #fff; }
   .ly-tl .tl-text { flex: 1; min-width: 0; }
@@ -477,6 +477,10 @@ function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
 
 function initChart(d, t) {
   const last = d.highlight == null ? d.counts.length - 1 : d.highlight;
+  // 右轴原本写死成金额（$…tn），换成模板串后可承载任意单位（万人、亿元…）
+  const wAxisFmt = d.wealthAxisFormat || '${v}tn';
+  const wLabelFmt = d.wealthLabelFormat || '${v}tn';
+  const wDec = d.wealthDecimals == null ? 1 : d.wealthDecimals;
   chartInst = echarts.init(chartHost, null, { renderer: 'canvas' });
   chartInst.setOption({
     animation: false,
@@ -503,7 +507,7 @@ function initChart(d, t) {
         name: d.wealthUnit,
         nameTextStyle: { color: t.axis, fontSize: 15, align: 'left', padding: [0, 0, 6, 6] },
         splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: t.axis, fontSize: 15, formatter: v => '$' + v + 'tn' } }
+        axisLabel: { color: t.axis, fontSize: 15, formatter: v => wAxisFmt.replace('{v}', fmtInt(v)) } }
     ],
     series: [
       { type: 'bar', barWidth: '48%', z: 2,
@@ -519,8 +523,10 @@ function initChart(d, t) {
       { type: 'line', yAxisIndex: 1, z: 5, symbol: 'circle', symbolSize: 11, data: d.wealth,
         lineStyle: { color: t.line, width: 3 },
         itemStyle: { color: t.line, borderColor: '#FFFFFF', borderWidth: 2 },
+        // 折线上的数字落在柱子身上，给一层白底才读得清（否则荧光绿压在深蓝柱上）
         label: { show: true, position: 'top', distance: 11, fontSize: 16, fontWeight: 'bold', color: t.line,
-          formatter: p => '$' + Number(p.value).toFixed(1) + 'tn' } }
+          backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 5, padding: [3, 6],
+          formatter: p => wLabelFmt.replace('{v}', Number(p.value).toFixed(wDec)) } }
     ]
   });
 }

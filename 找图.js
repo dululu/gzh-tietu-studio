@@ -87,6 +87,8 @@ function fetchJson(url, extraHeaders, tries = 3) {
  */
 function download(url, dest, tries = 3) {
   const once = () => new Promise((resolve, reject) => {
+    // 上次被中断留下的 0 字节同名文件先清掉，否则它会被当成"已下载过"
+    if (fs.existsSync(dest) && fs.statSync(dest).size === 0) fs.rmSync(dest, { force: true });
     const file = fs.createWriteStream(dest);
     const fail = e => { try { file.close(); } catch (_) {} fs.rmSync(dest, { force: true }); reject(e); };
     const req = https.get(url, { headers: { 'User-Agent': UA }, timeout: 30000 }, res => {
