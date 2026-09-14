@@ -13,11 +13,19 @@
  *   node 找图.js pexels "robot laboratory" [条数]    Pexels · 全文搜（要 key）
  *   node 找图.js pexels-get "32778341" [输出目录] [宽] Pexels · 按 id 下载
  *
- * 三个源都是免费、可商用：
+ *   node 找图.js page "<文章URL>" [文件名] [宽]       新闻页取主图 + 标题/媒体/记者
+ *   node 找图.js url  "<图片直链>" [文件名] [宽]       直链取图（page 抓不到时兜底）
+ *
+ * 三个图源都是免费、可商用：
  *   维基共享 —— CC BY / CC BY-SA / 公有领域，CC BY 系必须署名
  *   NASA     —— 绝大多数是公有领域，署名写 "NASA" 或 "NASA/JSC"
  *   Pexels   —— 免署名（建议标），但不得转售原图、不得暗示照片中的人为你背书
  * 下载后请在贴图 foot 字段里写清「图源」与许可，这是使用条件，不是可选项。
+ *
+ * page / url 两个命令拉的是**官方媒体或任意网页**的图，规则和上面三个源完全不同：
+ * 不属于自由授权，只能用《著作权法》第二十四条的"报道时事新闻"合理使用空间，
+ * 必须标来源 + 不遮盖署名 + 不用于带货。细节见说明书 4.5。
+ * 微博 / 小红书 / B站 / 百度图片这类平台**默认保留全部权利**，不要直接扒。
  *
  * Pexels key 从哪来（按顺序找，都不改脚本）：
  *   1. 环境变量 PEXELS_API_KEY
@@ -28,6 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const zlib = require('zlib');
 const { execFileSync } = require('child_process');
 
 const HERE = __dirname;
@@ -343,6 +352,225 @@ async function pexelsGet(id, outDir, width) {
   console.log('foot 建议写法：图片：' + p.photographer + ' / Pexels');
 }
 
+/* ================= 官方媒体 / 任意网页（要人工判断合理使用） ================= */
+
+// 新闻站多半会挡掉没有 UA 的请求，也多半会返回 gzip/br，这里都处理掉
+const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+  + '(KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
+function decodeEntities(s) {
+  return String(s)
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+}
+
+function fetchText(url, depth = 0) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        'Accept': 'text/html,application/xhtml+xml,*/*',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      },
+      timeout: 25000,
+    }, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 5) {
+        res.resume();
+        const next = new URL(res.headers.location, url).toString();
+        return fetchText(next, depth + 1).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error('HTTP ' + res.statusCode));
+      }
+      const enc = String(res.headers['content-encoding'] || '').toLowerCase();
+      let stream = res;
+      try {
+        if (enc.includes('br')) stream = res.pipe(zlib.createBrotliDecompress());
+        else if (enc.includes('gzip')) stream = res.pipe(zlib.createGunzip());
+        else if (enc.includes('deflate')) stream = res.pipe(zlib.createInflate());
+      } catch (e) { /* 解不开就按原文读 */ }
+      let buf = '';
+      stream.setEncoding('utf8');
+      stream.on('data', d => { buf += d; });
+      stream.on('end', () => resolve(buf));
+      stream.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('连接超时')));
+    req.on('error', reject);
+  });
+}
+
+/** 取 <meta property|name="x" content="y">，两种属性顺序都试 */
+function pickMeta(html, names) {
+  for (const n of names) {
+    const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const a = new RegExp('<meta[^>]+(?:property|name|itemprop)=["\']' + esc + '["\'][^>]*?content=["\']([^"\']+)["\']', 'i');
+    const b = new RegExp('<meta[^>]+content=["\']([^"\']+)["\'][^>]*?(?:property|name|itemprop)=["\']' + esc + '["\']', 'i');
+    const m = html.match(a) || html.match(b);
+    if (m && m[1].trim()) return decodeEntities(m[1]).trim();
+  }
+  return '';
+}
+
+function pickAuthor(html) {
+  const direct = pickMeta(html, ['author', 'article:author', 'og:article:author', 'weibo:article:create_at', 'bytedance:author']);
+  if (direct && !/^https?:/i.test(direct)) return direct;
+  const ld = html.match(/"author"\s*:\s*\{[^}]*?"name"\s*:\s*"([^"]{2,40})"/);
+  if (ld) return decodeEntities(ld[1]);
+  const named = html.match(/记者\s*[：:]\s*([\u4e00-\u9fa5]{2,4})/);
+  if (named) return named[1];
+  return '';
+}
+
+function pickTitle(html) {
+  const t = pickMeta(html, ['og:title', 'twitter:title', 'title']);
+  if (t) return t;
+  const m = html.match(/<title[^>]*>([\s\S]{0,120}?)<\/title>/i);
+  return m ? decodeEntities(m[1]).replace(/\s+/g, ' ').trim() : '';
+}
+
+function safeName(s, fallback) {
+  const v = String(s || '').replace(/[\\/:*?"<>|#%\s]+/g, '_').replace(/^_+|_+$/g, '');
+  return (v.slice(0, 28) || fallback);
+}
+
+/** 直链取图：图你从哪来自己清楚，这里只负责落盘 + 报尺寸 */
+async function urlGet(imgUrl, name, width) {
+  const dir = path.resolve(process.cwd(), 'img');
+  fs.mkdirSync(dir, { recursive: true });
+  const ext = (imgUrl.match(/\.(jpe?g|png|webp)(?![a-z])/i) || [, 'jpg'])[1].toLowerCase();
+  const dest = path.join(dir, safeName(name || path.basename(imgUrl).replace(/\.[^.]+$/, ''), 'media') + '.' + (ext === 'jpeg' ? 'jpg' : ext));
+  await download(imgUrl, dest);
+  const before = Math.round(fs.statSync(dest).size / 1024);
+  shrink(dest, width);
+  let dim = '';
+  try {
+    const info = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', dest], { encoding: 'utf8' });
+    const w = (info.match(/pixelWidth:\s*(\d+)/) || [])[1];
+    const h = (info.match(/pixelHeight:\s*(\d+)/) || [])[1];
+    if (w && h) dim = `${w}×${h}`;
+  } catch (e) { /* 非 macOS 拿不到尺寸，不影响出图 */ }
+  console.log(`已下载  ${dest}`);
+  console.log(`尺寸    ${dim || '未知'}   体积 ${before} KB → ${Math.round(fs.statSync(dest).size / 1024)} KB`);
+  console.log(`原链    ${imgUrl}`);
+  copyrightNote();
+  console.log('\nfoot 里必须写清「图片：<媒体名> <记者>」+「来源：<原文链接>」，别只写个链接。');
+}
+
+/** 兜底：从正文里扒 <img>。很多国内新闻站没写 og:image，
+ *  但正文图就摆在那儿。按 data-src / src 收集，滤掉站标、二维码、图标。 */
+function pickImgs(html, base, limit = 8) {
+  const out = [];
+  const re = /<img\b[^>]*>/gi;
+  let m;
+  while ((m = re.exec(html)) && out.length < limit * 3) {
+    const tag = m[0];
+    const src = (tag.match(/(?:data-original|data-lazy-src|data-echo|data-src|src)\s*=\s*["']([^"']+)["']/i) || [])[1];
+    if (!src || /^data:/i.test(src) || /\.svg(\?|$)/i.test(src)) continue;
+    if (/(logo|icon|avatar|qrcode|qr_|share|sprite|placeholder|blank\.|spacer|ad_|banner_s)/i.test(src)) continue;
+    if (/(w|width)=(1|2|3)\d{2}\b/i.test(src)) continue;      // URL 里带 width=1xx 的缩略图
+    try { out.push(new URL(src, base).toString()); } catch (e) { /* 不是合法地址就跳过 */ }
+  }
+  return [...new Set(out)].slice(0, limit);
+}
+
+/** 文章页取图：优先 og:image / twitter:image，没有就扒正文 <img>；顺手读出标题、媒体、记者 */
+async function pageGet(pageUrl, name, width) {
+  const html = await fetchText(pageUrl);
+  const u = new URL(pageUrl);
+  const title = pickTitle(html);
+  const site = pickMeta(html, ['og:site_name', 'application-name']) || u.hostname.replace(/^www\./, '');
+  const author = pickAuthor(html);
+  const pub = pickMeta(html, ['article:published_time', 'og:release_date', 'pubdate', 'publishdate']);
+
+  console.log(`标题    ${title || '(没读到)'}`);
+  console.log(`媒体    ${site}`);
+  if (author) console.log(`作者    ${author}`);
+  if (pub) console.log(`时间    ${pub.slice(0, 10)}`);
+
+  const metaImg = pickMeta(html, ['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src']);
+  const candidates = [...new Set([metaImg, ...pickImgs(html, pageUrl)].filter(Boolean))];
+  if (!candidates.length) {
+    console.log('\n这个页面既没有 og:image 也没有可用的 <img>（多半是 JS 渲染的）。');
+    console.log('请手动右键复制图片地址，再用：');
+    console.log('  node 找图.js url "<图片直链>" "' + safeName(name || title, 'media') + '"');
+    return;
+  }
+  if (!metaImg) console.log(`\n页面没写 og:image，改从正文 <img> 里挑（共 ${candidates.length} 个候选）`);
+
+  const dir = path.resolve(process.cwd(), 'img');
+  fs.mkdirSync(dir, { recursive: true });
+
+  // 依次试，第一个宽度够 800 的就是正文图；都不够就留最宽的那张并告警
+  let best = null;   // { dest, w, url }
+  for (const cand of candidates.slice(0, 5)) {
+    const idx = candidates.indexOf(cand);
+    const ext = (cand.match(/\.(jpe?g|png|webp)(?![a-z])/i) || [, 'jpg'])[1].toLowerCase();
+    const out = path.join(dir, safeName(name || title, 'media')
+      + (idx ? '_' + (idx + 1) : '') + '.' + (ext === 'jpeg' ? 'jpg' : ext));
+    let w = 0;
+    try {
+      await download(cand, out);
+      const info = execFileSync('sips', ['-g', 'pixelWidth', out], { encoding: 'utf8' });
+      w = Number((info.match(/pixelWidth:\s*(\d+)/) || [])[1] || 0);
+    } catch (e) {
+      fs.rmSync(out, { force: true });
+      continue;                       // 这张抓不动，换下一个
+    }
+    if (!best || w > best.w) {
+      if (best) fs.rmSync(best.dest, { force: true });   // 上一张猜错的清掉，别在 img/ 里堆垃圾
+      best = { dest: out, w, url: cand };
+    } else {
+      fs.rmSync(out, { force: true });
+    }
+    if (w >= 800) break;
+  }
+
+  // 400px 以下基本是站标/图标，别把垃圾留在 img/ 里
+  if (best && best.w && best.w < 400) {
+    fs.rmSync(best.dest, { force: true });
+    best = null;
+  }
+  if (!best) {
+    console.log('\n没从正文里找到像样的图（站点可能是 JS 渲染的，或有反爬）。');
+    console.log('请右键复制图片地址，再用：');
+    console.log('  node 找图.js url "<图片直链>" "' + safeName(name || title, 'media') + '"');
+    return;
+  }
+
+  const dest = best.dest, gotW = best.w, usedUrl = best.url;
+  const before = Math.round(fs.statSync(dest).size / 1024);
+  shrink(dest, width);
+  console.log(`\n已下载  ${dest}`);
+  console.log(`尺寸    宽 ${gotW || '未知'}   体积 ${before} KB → ${Math.round(fs.statSync(dest).size / 1024)} KB`);
+  console.log(`原链    ${usedUrl}`);
+  if (gotW && gotW < 800) console.log('⚠️ 猜到的这张偏小，八成不是正文图，建议改用 url 模式自己指定');
+
+  console.log('\nfoot 建议写法（照抄，把值换成实际的）：');
+  console.log(`  "图片：${site}${author ? '（' + author + '）' : ''}"`);
+  console.log(`  "来源：${pageUrl}"`);
+  console.log('  若原文标注了摄影/图片来源，以原文为准。');
+  copyrightNote();
+}
+
+// 这段提醒不是客套：这一类图和自由授权图的规则完全不同，写错就是把风险留在账号上
+function copyrightNote() {
+  console.log('\n────────────────────────────────────────');
+  console.log('合理使用不是"随便用"。《著作权法》第二十四条允许为报道时事新闻');
+  console.log('「不可避免地再现或者引用已经发表的作品」，四个要件都要满足：');
+  console.log('  ① 为报道该时事新闻（这条新闻本身的配图 ✅；只当气氛图 ❌）');
+  console.log('  ② 不可避免（能换自由授权图的位置就别用）');
+  console.log('  ③ 指明作者与来源（媒体名 + 记者 + 链接，缺一不可）');
+  console.log('  ④ 不损害权利人合法权益（不裁掉/遮盖署名水印，不用于带货导购）');
+  console.log('另：账号开通流量主、接商单时，风险会明显上升。');
+  console.log('────────────────────────────────────────');
+}
+
 /* ================= 主流程 ================= */
 
 (async () => {
@@ -364,6 +592,10 @@ async function pexelsGet(id, outDir, width) {
     await pexelsSearch(q, Number(argv[argv.length - 1]) || 8);
   } else if (cmd === 'pexels-get') {
     await pexelsGet(argv[1], argv[2], Number(argv[3]) || 1600);
+  } else if (cmd === 'url') {
+    await urlGet(argv[1], argv[2], Number(argv[3]) || 1600);
+  } else if (cmd === 'page') {
+    await pageGet(argv[1], argv[2], Number(argv[3]) || 1600);
   } else {
     console.log('用法:');
     console.log('  node 找图.js search "humanoid robot" 8');
@@ -373,5 +605,9 @@ async function pexelsGet(id, outDir, width) {
     console.log('  node 找图.js nasa-get "PIA07081" img');
     console.log('  node 找图.js pexels "robot laboratory" 8');
     console.log('  node 找图.js pexels-get "32778341" img 1600');
+    console.log('');
+    console.log('官方媒体 / 任意网页（规则不同，见说明书 4.5）:');
+    console.log('  node 找图.js page "<文章URL>" "文件名" 1600   # 抓主图 + 标题/媒体/记者');
+    console.log('  node 找图.js url  "<图片直链>" "文件名" 1600   # 页面抓不到时的兜底');
   }
 })().catch(e => { console.error('出错: ' + e.message); process.exit(1); });
