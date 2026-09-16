@@ -99,10 +99,12 @@ if [ -f "$EXTRA_FILE" ]; then
   EXTRA="$(cat "$EXTRA_FILE")"
 else
   probe_prof="$(mktemp -d)"
-  # 用子 shell 包一层：Chrome 自身沙箱起不来时会带信号退出，而报 "Trace/BPT trap" 的是
-  # **父 shell**，命令末尾的 2>&1 拦不住它 —— 得让子 shell 去报，才能一起丢掉。
-  if ( "$CHROME" --headless=new --disable-gpu --user-data-dir="$probe_prof" \
-         --dump-dom about:blank >/dev/null 2>&1 ) 2>/dev/null; then
+  # 用 `{ ...; } 2>/dev/null` 包一层：Chrome 自身沙箱起不来时会带信号退出，而报
+  # "Trace/BPT trap" 的是**执行它的那个 shell**，命令末尾的 2>&1 拦不住（shell 是在
+  # 重定向撤销之后才打印的）。注意别写成 `( cmd ) 2>/dev/null` —— 单命令的子 shell
+  # 会被 bash 优化掉、根本没 fork，重定向照样不生效。
+  if { "$CHROME" --headless=new --disable-gpu --user-data-dir="$probe_prof" \
+         --dump-dom about:blank >/dev/null 2>&1; } 2>/dev/null; then
     EXTRA=""
   else
     EXTRA="--no-sandbox"
