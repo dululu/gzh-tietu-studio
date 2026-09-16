@@ -265,6 +265,158 @@
   .ly-tl .tl-text b { font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-size: 26px; font-weight: 700; color: var(--title); }
   .ly-tl .tl-text p { margin-top: 6px; font-size: 19px; color: var(--axis); line-height: 1.5; }
 
+  /* ===== 版式 vs：对峙式对比（结论词 + 要点 + 适配人群） =====
+     和 compare 的区别：compare 是"两栏文字"，vs 先把每侧压缩成一个**结论词**
+     （先宽后窄 / 一步到位），再加"适合谁"的一句话收尾 —— 让读者一眼看到差别，
+     而不是逐条读完两栏再自己总结。
+     2026-09-16 海报化：顶部压 8px 主题色条（色块分割）、结论词 29→40px、
+     中间 VS 徽章 50→68px 并倾斜、底部"适合谁"从虚线细字改成实心胶囊。 */
+  .ly-vs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-vs .vs-title {
+    flex: none; text-align: center;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 31px; color: var(--title);
+  }
+  .ly-vs .vs-stage { flex: 1; min-height: 0; display: flex; align-items: stretch; margin-top: 22px; }
+  .ly-vs .side { flex: 1; min-width: 0; border-radius: 18px; padding: 26px 20px 22px; display: flex; flex-direction: column; align-items: center; }
+  .ly-vs .side.l { background: #FFFFFF; border: 2px solid var(--soft-line); border-top: 8px solid var(--card); }
+  .ly-vs .side.r { background: var(--card); border: 2px solid var(--card); border-top: 8px solid rgba(255,255,255,.9); }
+  /* 结论词标签：胶囊改直角色块，更硬朗（运营海报里标签是"色块"不是"药丸"） */
+  .ly-vs .side .tag { flex: none; padding: 8px 22px; border-radius: 8px; font-size: 22px; font-weight: 800; letter-spacing: 2px; white-space: nowrap; }
+  .ly-vs .side.l .tag { background: var(--card); color: #FFFFFF; }
+  .ly-vs .side.r .tag { background: #FFFFFF; color: var(--card); }
+  /* 反差排第一：结论词是全图第二大的字（仅次于主标题） */
+  .ly-vs .side .nm { flex: none; margin-top: 16px; font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-weight: 700; font-size: 40px; letter-spacing: 1px; line-height: 1.15; }
+  .ly-vs .side.l .nm { color: var(--title); }
+  .ly-vs .side.r .nm { color: #FFFFFF; }
+  .ly-vs .side ul { flex: 1; min-height: 0; width: 100%; margin-top: 14px; list-style: none; display: flex; flex-direction: column; justify-content: space-evenly; gap: 10px; }
+  .ly-vs .side li { position: relative; padding-left: 19px; font-size: 19px; line-height: 1.42; }
+  .ly-vs .side li::before { content: ""; position: absolute; left: 0; top: 11px; width: 8px; height: 8px; border-radius: 50%; }
+  .ly-vs .side.l li { color: var(--axis); }
+  .ly-vs .side.l li::before { background: var(--card); }
+  .ly-vs .side.r li { color: rgba(255,255,255,.93); }
+  .ly-vs .side.r li::before { background: rgba(255,255,255,.6); }
+  /* "适合谁"做成实心胶囊标签（原来是虚线细字，收尾太弱） */
+  .ly-vs .side .fit { flex: none; max-width: 100%; margin-top: 16px; padding: 9px 18px; border-radius: 999px; text-align: center; font-size: 18px; font-weight: 700; line-height: 1.4; }
+  .ly-vs .side.l .fit { color: var(--title); background: var(--soft); }
+  .ly-vs .side.r .fit { color: #FFFFFF; background: rgba(255,255,255,.18); }
+  .ly-vs .mid { flex: none; width: 68px; display: flex; align-items: center; justify-content: center; }
+  /* 中间 VS 徽章：放大 + 轻微倾斜 + 外环，"对峙"感靠它撑 */
+  .ly-vs .mid span {
+    position: relative; z-index: 2;
+    width: 68px; height: 68px; border-radius: 50%;
+    background: var(--title); color: #FFFFFF;
+    font-size: 26px; font-weight: 800; letter-spacing: .5px;
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(-7deg);
+    box-shadow: 0 0 0 6px #FFFFFF, 0 10px 24px rgba(0,0,0,.22);
+  }
+
+  /* ===== 版式 cards：编号行动卡（可标警示） =====
+     三件事各占一张卡，大号编号 + 右上角动作标签（行动 / 留意 / 警示）。
+     和 list 的区别：list 靠"序号方块"起头，视线是竖着扫一列字；cards 每张卡是
+     一个封闭单元，标签直接告诉读者"这条要干什么"。warn 用固定警示红，
+     刻意脱离主题色 —— 警示不跟着配色走，才不会在同一套色里被读漏。
+     2026-09-16 海报化：编号从淡色水印改成**实心色块**（一张卡一个视觉锚点）、
+     动作标签改成**倾斜贴纸**、左侧色条 6→8px。 */
+  .ly-cards { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-cards .cd-title {
+    flex: none; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 31px; color: var(--title);
+  }
+  .ly-cards .cd-list { flex: 1; min-height: 0; margin-top: 16px; display: flex; flex-direction: column; justify-content: space-evenly; gap: 14px; }
+  .ly-cards .cd { display: flex; gap: 18px; align-items: center; background: var(--soft); border-radius: 16px; border-left: 8px solid var(--card); padding: 18px 22px; }
+  .ly-cards .cd.warn { background: #FCEDEA; border-left-color: #CE4038; }
+  /* 反差排第一：编号从"54px 淡色水印"改成实心色块，卡片一眼有重点 */
+  .ly-cards .cd .no {
+    flex: none; width: 74px; height: 74px; border-radius: 18px;
+    background: var(--card); color: #FFFFFF; opacity: 1;
+    font-size: 34px; font-weight: 800; letter-spacing: -1px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ly-cards .cd.warn .no { background: #CE4038; }
+  .ly-cards .cd .bd { flex: 1; min-width: 0; }
+  .ly-cards .cd .hd { display: flex; align-items: center; gap: 12px; }
+  .ly-cards .cd .hd b { font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-weight: 700; font-size: 28px; color: var(--title); line-height: 1.25; }
+  /* 动作标签做成倾斜贴纸（运营海报的老办法：贴纸比药丸更"跳"） */
+  .ly-cards .cd .bdg {
+    flex: none; padding: 6px 15px; border-radius: 6px;
+    font-size: 17px; font-weight: 800; letter-spacing: 1px;
+    background: var(--card); color: #FFFFFF;
+    transform: rotate(-4deg);
+    box-shadow: 2px 3px 0 rgba(16,24,40,.14);
+  }
+  .ly-cards .cd.warn .bdg { background: #CE4038; }
+  .ly-cards .cd p { margin-top: 7px; font-size: 20px; color: var(--axis); line-height: 1.5; }
+
+  /* ===== 版式 steps：四步阶梯（逐级右移，末级反白） =====
+     每步比上一步多缩进，形成"往上走"的台阶感；末级用主题色反白当终点。
+     和 timeline 的区别：timeline 是一条竖线串起的**时间顺序**，steps 强调
+     "一步比一步更靠后"的推进关系，末级是落点。
+     2026-09-16 海报化：位移 24→34px（台阶更明显）、序号圆圈改成**方形色块**、
+     左侧加 8px 色条（和 cards 同一套"色块编号"语言）。 */
+  .ly-steps { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-steps .st-title {
+    flex: none; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 31px; color: var(--title);
+  }
+  .ly-steps .st-list { flex: 1; min-height: 0; margin-top: 14px; display: flex; flex-direction: column; justify-content: space-evenly; gap: 12px; }
+  .ly-steps .st {
+    display: flex; gap: 18px; align-items: center; border-radius: 14px;
+    background: #FFFFFF; border: 2px solid var(--soft-line); border-left: 8px solid var(--card);
+    padding: 13px 20px; margin-left: calc(var(--i, 0) * 34px);
+  }
+  .ly-steps .st:nth-child(even) { background: var(--soft); }
+  .ly-steps .st .dot {
+    flex: none; width: 54px; height: 54px; border-radius: 16px;
+    background: var(--card); color: #FFFFFF;
+    font-size: 26px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ly-steps .st .bd { flex: 1; min-width: 0; }
+  .ly-steps .st .when { font-size: 19px; font-weight: 700; color: var(--card); letter-spacing: 1px; }
+  .ly-steps .st b { margin-left: 10px; font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-size: 29px; font-weight: 700; color: var(--title); }
+  .ly-steps .st p { margin-top: 5px; font-size: 19px; color: var(--axis); line-height: 1.45; }
+  .ly-steps .st:last-child { background: var(--card); border-color: var(--card); border-left-color: var(--card); }
+  .ly-steps .st:last-child .dot { background: #FFFFFF; color: var(--card); }
+  .ly-steps .st:last-child .when { color: rgba(255,255,255,.85); }
+  .ly-steps .st:last-child b { color: #FFFFFF; }
+  .ly-steps .st:last-child p { color: rgba(255,255,255,.9); }
+
+  /* ===== 版式 hero：大图压标题 + 底部要点条 =====
+     和 photo 的区别：photo 是"图 + 图下一行注"，标题在卡片顶部、图和标题互不相干；
+     hero 把一句结论**压在图上**，让图直接承载观点，图下再补三张短要点卡。
+     2026-09-16 海报化：结论 40→54px 并垫一条半透明白色高亮块（大字主视觉），
+     图下三卡的编号放大到 40px、卡顶压 6px 主题色条。 */
+  .ly-hero { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-hero .hero-stage {
+    position: relative; flex: 1; min-height: 0; border-radius: 16px; overflow: hidden;
+    background: linear-gradient(160deg, var(--thumb-from) 0%, var(--thumb-to) 100%);
+  }
+  .ly-hero .hero-stage > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .ly-hero .hero-stage > .placeholder { position: absolute; inset: 0; border-radius: 0; border: 0; }
+  .ly-hero .hero-scrim {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 72%;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.32) 42%, rgba(0,0,0,.8) 100%);
+  }
+  .ly-hero .hero-cap { position: absolute; left: 30px; right: 30px; bottom: 26px; text-align: center; }
+  .ly-hero .hero-cap b {
+    display: inline-block; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 54px; color: #FFFFFF; letter-spacing: 2px; line-height: 1.18;
+    padding: 0 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0) 64%, rgba(255,255,255,.28) 64%);
+    text-shadow: 0 3px 16px rgba(0,0,0,.5);
+  }
+  .ly-hero .hero-cap span {
+    display: block; margin-top: 12px; font-size: 21px; color: rgba(255,255,255,.94);
+    letter-spacing: 1px; text-shadow: 0 2px 10px rgba(0,0,0,.55);
+  }
+  .ly-hero .hero-body { flex: none; margin-top: 18px; display: flex; gap: 14px; }
+  .ly-hero .hi { flex: 1; min-width: 0; background: var(--soft); border-radius: 13px; padding: 14px 16px 15px; border-top: 6px solid var(--card); }
+  .ly-hero .hi .k { display: block; font-size: 40px; font-weight: 800; color: var(--card); line-height: 1; letter-spacing: -2px; }
+  .ly-hero .hi b { display: block; margin-top: 9px; font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-size: 22px; font-weight: 700; color: var(--title); line-height: 1.3; }
+  .ly-hero .hi p { margin-top: 6px; font-size: 17px; color: var(--axis); line-height: 1.45; }
+
   /* ---------- 固定件 4：底部来源 ---------- */
   .footnote { flex: none; margin-top: 18px; font-size: 16px; line-height: 1.8; color: var(--foot); }
   .footnote.empty { display: none; }
@@ -319,6 +471,10 @@
       <option value="photo">单图 + 图注</option>
       <option value="photoFocus">主图 + 圆形焦点</option>
       <option value="duo">双主体 + 金句 + 四宫格</option>
+      <option value="vs">对峙式对比（结论词 + VS）</option>
+      <option value="cards">编号行动卡（可标警示）</option>
+      <option value="steps">四步阶梯（末级反白）</option>
+      <option value="hero">大图压标题 + 要点条</option>
     </select>
     <select id="themePick"></select>
     <span class="swatches" id="swatches"></span>
@@ -448,6 +604,55 @@ const LAYOUTS = {
           <div class="tl-dotcol"><span class="dot"></span></div>
           <div class="tl-text"><b>${it.h || ''}</b><p>${it.p || ''}</p></div>
         </div>`).join('')}</div>
+    </div>`,
+
+  /* ---- 以下 4 个是 2026-09-16 新增，用来替掉纯文字版的对比 / 清单 / 时间轴 / 单图 ---- */
+  vs: d => {
+    const side = (cls, tag, nm, items, fit) => `<div class="side ${cls}">
+        ${tag ? `<span class="tag">${tag}</span>` : ''}
+        <div class="nm">${nm || ''}</div>
+        <ul>${(items || []).map(s => `<li>${s}</li>`).join('')}</ul>
+        ${fit ? `<div class="fit">${fit}</div>` : ''}
+      </div>`;
+    return `<div class="ly-vs">
+      <div class="vs-title">${d.vsTitle || ''}</div>
+      <div class="vs-stage">
+        ${side('l', d.vsLeftTag, d.vsLeftTitle, d.vsLeftItems, d.vsLeftFit)}
+        <div class="mid"><span>${d.vsMid || 'VS'}</span></div>
+        ${side('r', d.vsRightTag, d.vsRightTitle, d.vsRightItems, d.vsRightFit)}
+      </div>
+    </div>`;
+  },
+
+  cards: d => `<div class="ly-cards">
+      <div class="cd-title">${d.cardsTitle || ''}</div>
+      <div class="cd-list">${(d.cards || []).map((c, i) => `
+        <div class="cd${c.warn ? ' warn' : ''}">
+          <span class="no">${c.n || String(i + 1).padStart(2, '0')}</span>
+          <div class="bd">
+            <div class="hd"><b>${c.h || ''}</b>${c.tag ? `<span class="bdg">${c.tag}</span>` : ''}</div>
+            <p>${c.p || ''}</p>
+          </div>
+        </div>`).join('')}</div>
+    </div>`,
+
+  steps: d => `<div class="ly-steps">
+      <div class="st-title">${d.stTitle || ''}</div>
+      <div class="st-list">${(d.stItems || []).map((it, i) => `
+        <div class="st" style="--i:${i}">
+          <span class="dot">${i + 1}</span>
+          <div class="bd"><span class="when">${it.t || ''}</span><b>${it.h || ''}</b><p>${it.p || ''}</p></div>
+        </div>`).join('')}</div>
+    </div>`,
+
+  hero: d => `<div class="ly-hero">
+      <div class="hero-stage">
+        ${ph(d.img, '', '在此放主图（校园 / 现场 / 实拍）')}
+        <div class="hero-scrim"></div>
+        <div class="hero-cap"><b>${d.heroTitle || ''}</b>${d.heroLead ? `<span>${d.heroLead}</span>` : ''}</div>
+      </div>
+      <div class="hero-body">${(d.heroItems || []).map((it, i) => `
+        <div class="hi"><span class="k">${String(i + 1).padStart(2, '0')}</span><b>${it.h || ''}</b>${it.p ? `<p>${it.p}</p>` : ''}</div>`).join('')}</div>
     </div>`
 };
 
@@ -617,6 +822,14 @@ function render(injected) {
   fitText(document.getElementById('duoQuote'), 30, 22);
   // 四宫格标签长度不一，逐个缩到单行，不然长的折两行、四个格子高低不齐
   content.querySelectorAll('.quad-label').forEach(el => fitText(el, 19, 13));
+  // 新增版式里几处"最好单行"的标题：放不下就缩字号，缩到底再放开换行
+  content.querySelectorAll('.vs-title, .cd-title, .st-title').forEach(el => fitText(el, 31, 20));
+  content.querySelectorAll('.ly-vs .nm').forEach(el => fitText(el, 40, 24));
+  content.querySelectorAll('.ly-vs .side .tag').forEach(el => fitText(el, 22, 16));
+  content.querySelectorAll('.ly-vs .side .fit').forEach(el => fitText(el, 18, 14));
+  content.querySelectorAll('.ly-cards .cd .hd b').forEach(el => fitText(el, 28, 18));
+  content.querySelectorAll('.ly-hero .hi b').forEach(el => fitText(el, 22, 17));
+  fitText(content.querySelector('.hero-cap b'), 54, 30);
 
   chartHost = document.getElementById('chartBox');
   if (chartHost) {

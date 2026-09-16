@@ -77,14 +77,16 @@ function parseMetrics(s) {
 
 /** 这个版式理论上该渲染出几张真图。要和 贴图模板.html 的 LAYOUTS 保持一致：
  *  photo / photoFocus 用 d.img 一张；duo 用 d.img + d.img2 + quadImgs 里非空的项；
- *  其余版式（stat/list/compare/timeline/chart/bar）不看图字段。 */
+ *  hero 是"大图压标题"，同样用 d.img 一张；
+ *  其余版式（stat/list/compare/timeline/chart/bar/vs/cards/steps）不看图字段。 */
 function expectImgs(d) {
   const one = v => (typeof v === 'string' && v.trim() ? 1 : 0);
   const quads = Array.isArray(d.quadImgs)
     ? d.quadImgs.filter(v => typeof v === 'string' && v.trim()).length : 0;
   switch (d && d.layout) {
     case 'photo':
-    case 'photoFocus': return one(d.img);
+    case 'photoFocus':
+    case 'hero': return one(d.img);
     case 'duo': return one(d.img) + one(d.img2) + quads;
     default: return 0;
   }

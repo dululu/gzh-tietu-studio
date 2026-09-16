@@ -64,11 +64,39 @@ function textW(s, size) {
   return w;
 }
 
-function fitSize(s, base, avail, ls) {
+function fitSize(s, base, avail, ls, floor = 24) {
   let size = base;
   const n = [...String(s || '')].length;
-  while (size > 24 && textW(s, size) + (ls || 0) * Math.max(0, n - 1) > avail) size -= 1;
+  while (size > floor && textW(s, size) + (ls || 0) * Math.max(0, n - 1) > avail) size -= 1;
   return size;
+}
+
+/* SVG 的 <text> 不会自动折行（HTML 会），所以长句必须自己切。
+   CJK 任意处可断、 ASCII 连续段（词/数字/年份）不拆 —— 和浏览器的断行习惯接近。 */
+function wrapText(s, size, avail, ls = 0) {
+  const w = str => textW(str, size) + ls * Math.max(0, [...str].length - 1);
+  const lines = [];
+  let cur = '';
+  for (const ch of String(s == null ? '' : s)) {
+    if (cur && w(cur + ch) > avail) { lines.push(cur); cur = ch; }
+    else cur += ch;
+  }
+  if (cur || !lines.length) lines.push(cur);
+  return lines;
+}
+
+/** 多行文本块：y 为首行顶端，返回 { svg, h }（h 为整块高，便于往下排版） */
+function TBlock(o) {
+  const { x, y, s, size = 18, lh = 1.45, avail, fill = '#000', weight = 400,
+    family = BODY_FONT, ls = 0, anchor = 'start', opacity } = o;
+  const lines = wrapText(s, size, avail, ls);
+  const lineH = size * lh;
+  return {
+    svg: lines.map((ln, i) => T({
+      x, cy: y + i * lineH + lineH / 2, s: ln, size, fill, weight, family, ls, anchor, opacity
+    })).join(''),
+    h: lines.length * lineH
+  };
 }
 
 function T({ x, cy, s, size = 14, fill = '#000', weight = 400, family = BODY_FONT, ls = 0, anchor = 'middle', opacity }) {
@@ -583,7 +611,298 @@ function contentTl(d, top, bottom, t) {
   return svg + `</g>`;
 }
 
+/* ===== 以下 4 个版式是 2026-09-16 新增，与 贴图模板.html 同源 =====
+   用来替掉纯文字版的对比 / 清单 / 时间轴 / 单图。字段与 HTML 完全一致。 */
+
+// ---- vs：对峙式对比（每侧先压成一个结论词，中间 VS 徽章） ----
+function contentVs(d, top, bottom, t) {
+  const titleH = 31 * 1.4;
+  const stageTop = top + titleH + 22;
+  const stageH = Math.max(160, bottom - stageTop);
+  const midW = 68, padX = 20, padY = 26, padB = 22, barH = 8;
+  const sideW = (CW - midW) / 2;
+  const tagH = 8 * 2 + 22 * 1.25;      // 直角色块（原来是胶囊）
+  const nmH = 40 * 1.15;               // 结论词 40px
+  const liSize = 19, liLH = 1.42;
+  const fitSize_ = 18, fitPadY = 9;
+
+  let svg = `<g id="内容区-对峙对比">`
+    + T({ x: CX, cy: top + titleH / 2, s: d.vsTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+
+  [[0, false, d.vsLeftTag, d.vsLeftTitle, d.vsLeftItems, d.vsLeftFit],
+   [1, true, d.vsRightTag, d.vsRightTitle, d.vsRightItems, d.vsRightFit]].forEach(([i, onCard, tag, nm, items, fit]) => {
+    const x = CX + i * (sideW + midW);
+    // 卡片本体 + 顶部 8px 主题色条（海报的"色块分割"），靠 clipPath 保证圆角
+    const cid = 'vsclip' + (++clipSeq);
+    svg += `<defs><clipPath id="${cid}"><rect x="${R(x)}" y="${R(stageTop)}" width="${R(sideW)}" height="${R(stageH)}" rx="18"/></clipPath></defs>`
+      + `<g clip-path="url(#${cid})">`
+      + rect(x, stageTop, sideW, stageH, onCard ? t.card : '#FFFFFF')
+      + rect(x, stageTop, sideW, barH, onCard ? '#FFFFFF' : t.card)
+      + `</g>`;
+    if (!onCard) svg += rect(x, stageTop, sideW, stageH, 'none', { rx: 18, stroke: t.softLine, sw: 2 });
+
+    const inkFill = onCard ? '#FFFFFF' : t.title;
+    const liFill = onCard ? '#FFFFFF' : t.axis;
+    const dotFill = onCard ? '#FFFFFF' : t.card;
+
+    let y = stageTop + padY;
+    if (tag) {
+      const tw = Math.min(sideW - padX * 2, textW(tag, 22) + 2 * Math.max(0, [...tag].length - 1) + 44);
+      svg += rect(x + (sideW - tw) / 2, y, tw, tagH, onCard ? '#FFFFFF' : t.card, { rx: 8 })
+        + T({ x: x + sideW / 2, cy: y + tagH / 2, s: tag, size: 22, fill: onCard ? t.card : '#FFFFFF', weight: 800, ls: 2 });
+      y += tagH;
+    }
+    if (nm) {
+      svg += T({ x: x + sideW / 2, cy: y + 16 + nmH / 2, s: nm, size: 40, fill: inkFill, weight: 700, family: TITLE_FONT, ls: 1 });
+      y += 16 + nmH;
+    }
+
+    const listTop = y + 14;
+    const fitH = fit ? 16 + fitPadY * 2 + fitSize_ * 1.4 : 0;
+    const listBot = stageTop + stageH - padB - fitH;
+    const liAvail = sideW - padX * 2 - 19;
+    const liH = liSize * liLH;
+    const rows = (items || []).map(s => wrapText(s, liSize, liAvail));
+    const totalH = rows.reduce((a, b) => a + b.length * liH, 0);
+    const slot = Math.max(0, (listBot - listTop - totalH) / (rows.length + 1));
+
+    let ly = listTop + slot;
+    rows.forEach(lines => {
+      lines.forEach((ln, k) => {
+        const cy = ly + k * liH + liH / 2;
+        if (k === 0) {
+          svg += `<circle cx="${R(x + padX + 4)}" cy="${R(cy)}" r="4" fill="${dotFill}"`
+            + (onCard ? ' opacity="0.6"' : '') + `/>`;
+        }
+        svg += T({ x: x + padX + 19, cy, s: ln, size: liSize, fill: liFill, anchor: 'start', opacity: onCard ? 0.93 : 1 });
+      });
+      ly += lines.length * liH + slot;
+    });
+
+    // "适合谁"收尾：实心胶囊（原来是虚线细字，太弱）
+    if (fit) {
+      const fH = fitPadY * 2 + fitSize_ * 1.4;
+      const fy = stageTop + stageH - padB - fH;
+      const fw = Math.min(sideW - padX * 2, textW(fit, fitSize_) + 2 * Math.max(0, [...fit].length - 1) + 36);
+      const fx = x + (sideW - fw) / 2;
+      svg += onCard
+        ? `<rect x="${R(fx)}" y="${R(fy)}" width="${R(fw)}" height="${R(fH)}" rx="${R(fH / 2)}" fill="#FFFFFF" opacity="0.18"/>`
+        : rect(fx, fy, fw, fH, t.soft, { rx: fH / 2 });
+      svg += T({ x: x + sideW / 2, cy: fy + fH / 2, s: fit, size: fitSize_, fill: onCard ? '#FFFFFF' : t.title, weight: 700 });
+    }
+  });
+
+  // 中间 VS 徽章：68px + 倾斜 -7° + 白色外环
+  const midCx = CX + sideW + midW / 2;
+  const midCy = stageTop + stageH * 0.5;
+  svg += `<g transform="rotate(-7 ${R(midCx)} ${R(midCy)})">`
+    + `<circle cx="${R(midCx)}" cy="${R(midCy)}" r="40" fill="#FFFFFF"/>`
+    + `<circle cx="${R(midCx)}" cy="${R(midCy)}" r="34" fill="${t.title}"/>`
+    + T({ x: midCx, cy: midCy, s: d.vsMid || 'VS', size: 26, fill: '#FFFFFF', weight: 800, ls: 0.5 })
+    + `</g>`;
+  return svg + `</g>`;
+}
+
+// ---- cards：编号行动卡（实心色块编号 + 倾斜贴纸标签，warn 用固定警示红） ----
+function contentCards(d, top, bottom, t) {
+  const titleH = 31 * 1.4;
+  const listTop = top + titleH + 16;
+  const rows = d.cards || [];
+  const n = rows.length || 1;
+  const padX = 22, padY = 18, barW = 8, gap = 18;
+  const noD = 74, noRx = 18;                 // 编号：实心色块，不是淡色水印
+  const bodyX = CX + barW + padX + noD + gap;
+  const bodyAvail = CW - (bodyX - CX) - padX;
+  const hdH = 28 * 1.25, badgeH = 17 * 1.25 + 12, pH = 20 * 1.5 + 7;
+  const innerH = Math.max(noD, hdH + pH);
+  const cardH = padY * 2 + innerH;
+  const slot = Math.max(0, (bottom - listTop - n * cardH) / (n + 1));
+
+  let svg = `<g id="内容区-行动卡">`
+    + T({ x: CX, cy: top + titleH / 2, s: d.cardsTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+
+  rows.forEach((c, i) => {
+    const y = listTop + slot + i * (cardH + slot);
+    const warn = !!c.warn;
+    const acc = warn ? '#CE4038' : t.card;          // 警示刻意脱离主题色
+    const bg = warn ? '#FCEDEA' : t.soft;
+    const cid = 'cardclip' + (++clipSeq);
+    svg += `<defs><clipPath id="${cid}"><rect x="${R(CX)}" y="${R(y)}" width="${R(CW)}" height="${R(cardH)}" rx="16"/></clipPath></defs>`
+      + `<g clip-path="url(#${cid})">`
+      + rect(CX, y, CW, cardH, bg)
+      + rect(CX, y, barW, cardH, acc)
+      + `</g>`
+      + rect(CX + barW + padX, y + cardH / 2 - noD / 2, noD, noD, acc, { rx: noRx })
+      + T({ x: CX + barW + padX + noD / 2, cy: y + cardH / 2, s: c.n || String(i + 1).padStart(2, '0'), size: 34, fill: '#FFFFFF', weight: 800, ls: -1 });
+
+    const bodyTop = y + padY + (innerH - (hdH + pH)) / 2;
+    const hdCy = bodyTop + hdH / 2;
+    const bdgW = c.tag ? textW(c.tag, 17) + 2 * Math.max(0, [...String(c.tag)].length - 1) + 30 : 0;
+    const bSize = fitSize(c.h, 28, bodyAvail - (bdgW ? bdgW + 12 : 0), 0, 18);
+    svg += T({ x: bodyX, cy: hdCy, s: c.h, size: bSize, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+    if (c.tag) {
+      // 倾斜贴纸：SVG 没有 box-shadow，用一块偏移的半透明黑垫在下面代替
+      const bx = bodyX + textW(c.h, bSize) + 12;
+      const by = hdCy - badgeH / 2;
+      const bxc = bx + bdgW / 2, byc = by + badgeH / 2;
+      svg += `<g transform="rotate(-4 ${R(bxc)} ${R(byc)})">`
+        + `<rect x="${R(bx + 2)}" y="${R(by + 3)}" width="${R(bdgW)}" height="${R(badgeH)}" rx="6" fill="#101828" opacity="0.14"/>`
+        + rect(bx, by, bdgW, badgeH, acc, { rx: 6 })
+        + T({ x: bxc, cy: byc, s: c.tag, size: 17, fill: '#FFFFFF', weight: 800, ls: 1 })
+        + `</g>`;
+    }
+    svg += TBlock({ x: bodyX, y: bodyTop + hdH + 7, s: c.p, size: 20, lh: 1.5, avail: bodyAvail, fill: t.axis, anchor: 'start' }).svg;
+  });
+  return svg + `</g>`;
+}
+
+// ---- steps：四步阶梯（逐级右移 34px，末级主题色反白当落点） ----
+function contentSteps(d, top, bottom, t) {
+  const titleH = 31 * 1.4;
+  const listTop = top + titleH + 14;
+  const rows = d.stItems || [];
+  const n = rows.length || 1;
+  const padX = 20, padY = 13, barW = 8, dotD = 54, dotRx = 16, gap = 18, step = 34;
+  const whenSize = 19, hSize = 29, pSize = 19;
+  const innerW = i => CW - i * step - barW - padX * 2 - dotD - gap;
+
+  // 先按折行算每级真实高度（文案长短不一，固定高度会把末级顶出页脚）
+  const blocks = rows.map((it, i) => {
+    const avail = innerW(i);
+    const whenW = textW(it.t || '', whenSize);
+    const hLines = wrapText(it.h || '', hSize, Math.max(80, avail - whenW - 10));
+    const pLines = wrapText(it.p || '', pSize, avail);
+    const textH = hLines.length * hSize * 1.3 + 5 + pLines.length * pSize * 1.45;
+    return { whenW, hLines, pLines, innerH: Math.max(dotD, textH) };
+  });
+  const heights = blocks.map(b => padY * 2 + 4 + b.innerH);
+  const slot = Math.max(0, (bottom - listTop - heights.reduce((a, b) => a + b, 0)) / (n + 1));
+
+  let svg = `<g id="内容区-四步阶梯">`
+    + T({ x: CX, cy: top + titleH / 2, s: d.stTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+
+  let y = listTop + slot;
+  rows.forEach((it, i) => {
+    const last = i === n - 1;
+    const b = blocks[i];
+    const cardH = heights[i];
+    const x = CX + i * step;
+    const w = CW - i * step;
+    const bg = last ? t.card : (i % 2 === 1 ? t.soft : '#FFFFFF');
+    const stroke = last ? t.card : t.softLine;
+    const inkFill = last ? '#FFFFFF' : t.title;
+    const bodyFill = last ? '#FFFFFF' : t.axis;
+
+    const cid = 'stclip' + (++clipSeq);
+    svg += `<defs><clipPath id="${cid}"><rect x="${R(x)}" y="${R(y)}" width="${R(w)}" height="${R(cardH)}" rx="14"/></clipPath></defs>`
+      + `<g clip-path="url(#${cid})">`
+      + rect(x, y, w, cardH, bg)
+      + rect(x, y, barW, cardH, last ? t.card : t.card)
+      + `</g>`
+      + rect(x, y, w, cardH, 'none', { rx: 14, stroke, sw: 2 })
+      + rect(x + barW + padX, y + cardH / 2 - dotD / 2, dotD, dotD, last ? '#FFFFFF' : t.card, { rx: dotRx })
+      + T({ x: x + barW + padX + dotD / 2, cy: y + cardH / 2, s: String(i + 1), size: 26, fill: last ? t.card : '#FFFFFF', weight: 800 });
+
+    const bx = x + barW + padX + dotD + gap;
+    const bodyH = b.hLines.length * hSize * 1.3 + 5 + b.pLines.length * pSize * 1.45;
+    let yy = y + padY + 2 + (b.innerH - bodyH) / 2;
+    const lineCy = yy + hSize * 1.3 / 2;
+    svg += T({ x: bx, cy: lineCy, s: it.t, size: whenSize, fill: last ? '#FFFFFF' : t.card, weight: 700, ls: 1, anchor: 'start', opacity: last ? 0.85 : 1 });
+    b.hLines.forEach((ln, k) => {
+      svg += T({
+        x: k === 0 ? bx + b.whenW + 10 : bx, cy: lineCy + k * hSize * 1.3, s: ln,
+        size: hSize, fill: inkFill, weight: 700, family: TITLE_FONT, anchor: 'start'
+      });
+    });
+    yy += b.hLines.length * hSize * 1.3 + 5;
+    b.pLines.forEach((ln, k) => {
+      svg += T({ x: bx, cy: yy + k * pSize * 1.45 + pSize * 1.45 / 2, s: ln, size: pSize, fill: bodyFill, anchor: 'start', opacity: last ? 0.9 : 1 });
+    });
+    y += cardH + slot;
+  });
+  return svg + `</g>`;
+}
+
+// ---- hero：大图压一句大字结论 + 图下三张短要点卡 ----
+function contentHero(d, top, bottom, t) {
+  const bodyGap = 18, hiGap = 14, hiPadX = 16, hiPadY = 14, hiBar = 6;
+  const hiW = (CW - hiGap * 2) / 3;
+  const hiAvail = hiW - hiPadX * 2;
+  const items = (d.heroItems || []).slice(0, 3);
+  const capSize = 54, leadSize = 21, kSize = 40, hSize = 22, pSize = 17;
+  const capNeed = capSize * 1.18 + (d.heroLead ? 12 + leadSize * 1.35 : 0);
+
+  let bodyH = 0;
+  const blocks = items.map(it => {
+    const bLines = wrapText(it.h || '', hSize, hiAvail);
+    const pLines = wrapText(it.p || '', pSize, hiAvail);
+    const h = hiPadY * 2 + hiBar + kSize + 9 + bLines.length * hSize * 1.3
+      + (it.p ? 6 + pLines.length * pSize * 1.45 : 0);
+    bodyH = Math.max(bodyH, h);
+    return { bLines, pLines };
+  });
+
+  const stageH = Math.max(160, (bottom - top) - bodyGap - bodyH);
+  const stageTop = top;
+
+  let svg = `<g id="内容区-大图压标题">`
+    + imgCard(d.img, CX, stageTop, CW, stageH, t, '在此放主图（校园 / 现场 / 实拍）', null, 16)
+    + `<defs><linearGradient id="heroScrim" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="#000000" stop-opacity="0"/>`
+    + `<stop offset="0.42" stop-color="#000000" stop-opacity="0.32"/>`
+    + `<stop offset="1" stop-color="#000000" stop-opacity="0.8"/>`
+    + `</linearGradient></defs>`
+    + rect(CX, stageTop + stageH * 0.28, CW, stageH * 0.72, 'url(#heroScrim)');
+
+  const capBottom = stageTop + stageH - 26;
+  let cy = capBottom - capNeed;
+  if (d.heroTitle) {
+    // 大字主视觉：先垫一条半透明白色高亮块（模拟 CSS 的 linear-gradient 下划线），再压字
+    const n = [...String(d.heroTitle)].length;
+    const capW = textW(d.heroTitle, capSize) + 2 * Math.max(0, n - 1) + 28;
+    const capLineH = capSize * 1.18;
+    svg += `<rect x="${R(W / 2 - capW / 2)}" y="${R(cy + capLineH * 0.64)}" width="${R(capW)}"`
+      + ` height="${R(capLineH * 0.36)}" fill="#FFFFFF" opacity="0.28"/>`
+      + T({ x: W / 2, cy: cy + capLineH / 2, s: d.heroTitle, size: capSize, fill: '#FFFFFF', weight: 700, family: TITLE_FONT, ls: 2 });
+    cy += capLineH;
+  }
+  if (d.heroLead) {
+    svg += T({ x: W / 2, cy: cy + 12 + leadSize * 1.35 / 2, s: d.heroLead, size: leadSize, fill: '#FFFFFF', weight: 400, ls: 1, opacity: 0.94 });
+  }
+  svg += `</g>`;
+
+  const bodyTop = stageTop + stageH + bodyGap;
+  let g = `<g id="内容区-大图压标题-要点">`;
+  items.forEach((it, i) => {
+    const x = CX + i * (hiW + hiGap);
+    const b = blocks[i];
+    const cid = 'hiclip' + (++clipSeq);
+    g += `<defs><clipPath id="${cid}"><rect x="${R(x)}" y="${R(bodyTop)}" width="${R(hiW)}" height="${R(bodyH)}" rx="13"/></clipPath></defs>`
+      + `<g clip-path="url(#${cid})">`
+      + rect(x, bodyTop, hiW, bodyH, t.soft)
+      + rect(x, bodyTop, hiW, hiBar, t.card)
+      + `</g>`
+      + T({ x: x + hiPadX, cy: bodyTop + hiPadY + kSize / 2, s: String(i + 1).padStart(2, '0'), size: kSize, fill: t.card, weight: 800, anchor: 'start', ls: -2 });
+    let yy = bodyTop + hiPadY + hiBar + kSize + 9;
+    b.bLines.forEach((ln, k) => {
+      g += T({ x: x + hiPadX, cy: yy + k * hSize * 1.3 + hSize * 1.3 / 2, s: ln, size: hSize, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+    });
+    yy += b.bLines.length * hSize * 1.3;
+    if (it.p) {
+      yy += 6;
+      b.pLines.forEach((ln, k) => {
+        g += T({ x: x + hiPadX, cy: yy + k * pSize * 1.45 + pSize * 1.45 / 2, s: ln, size: pSize, fill: t.axis, anchor: 'start' });
+      });
+    }
+  });
+  return svg + g + `</g>`;
+}
+
 const CONTENT = {
+  vs: contentVs,
+  cards: contentCards,
+  steps: contentSteps,
+  hero: contentHero,
   photo: contentPhoto,
   photoFocus: contentFocus,
   duo: contentDuo,
@@ -596,13 +915,18 @@ const CONTENT = {
 };
 
 /* ============ 组装 ============ */
+const unknownLayouts = new Set();
+
 function buildSVG(d) {
   const t = THEMES[d.theme] || THEMES.blue;
   const tb = titleBlock(d, t);
   const fb = footBlock(d, t);
   const top = tb.bottom + 26;
   const bottom = fb.top - 18;
-  const body = (CONTENT[d.layout] || CONTENT.photo)(d, top, bottom, t);
+  // 没登记的版式以前会静默退回 photo，导出的 SVG 跟 PNG 对不上还不报错 —— 现在记下来，跑完统一警告
+  const fn = CONTENT[d.layout];
+  if (d.layout && !fn) unknownLayouts.add(d.layout);
+  const body = (fn || CONTENT.photo)(d, top, bottom, t);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -667,6 +991,11 @@ ${cards}
 `, 'utf8');
 
   console.log('');
+  if (unknownLayouts.size) {
+    console.log('⚠️  以下版式还没在 CONTENT 里登记，已按 photo 兜底导出，请核对：');
+    [...unknownLayouts].forEach(u => console.log('  ' + u));
+    console.log('');
+  }
   if (unembedded.length) {
     console.log('以下图片没能内嵌，SVG 里是虚线占位框：');
     [...new Set(unembedded)].forEach(u => console.log('  ' + u));

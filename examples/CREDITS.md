@@ -17,6 +17,8 @@
 | `Ai-Da_Solo_Exhibition_at_the_United_Nations.jpg` | Aneonv36 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0) | [File:Ai-Da Solo Exhibition at the United Nations.jpg](https://commons.wikimedia.org/wiki/File:Ai-Da_Solo_Exhibition_at_the_United_Nations.jpg) |
 | `RoboSub_diver.jpg` | Rick Naystatt（美国海军） | 公有领域 | [File:14th Annual International RoboSub Competition 110713-N-UN340-007.jpg](https://commons.wikimedia.org/wiki/File:14th_Annual_International_RoboSub_Competition_110713-N-UN340-007.jpg) |
 | `Clean_room.jpg` | Duk（上传者） | 公有领域 | [File:Clean room.jpg](https://commons.wikimedia.org/wiki/File:Clean_room.jpg) |
+| `CN_jimei_library_interior.jpg` | Adapa11 | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | [File:Libraryinterior.JPG](https://commons.wikimedia.org/wiki/File:Libraryinterior.JPG)（集美大学图书馆内部，1920×1440，4:3） |
+| `CN_zzu_south_library.jpg` | Windmemories | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [File:20230619 Library of ZZU South Campus.jpg](https://commons.wikimedia.org/wiki/File:20230619_Library_of_ZZU_South_Campus.jpg)（郑州大学南校区图书馆，1280×853，3:2） |
 
 ## NASA
 

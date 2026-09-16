@@ -26,6 +26,11 @@ function resolveInput(name, fallbacks) {
 const srcFile = resolveInput(positional[0] || '贴图示例.json', ['examples/数据-九种版式示例.json']);
 const outDir = path.resolve(process.cwd(), positional[1] || '贴图输出');
 const title = positional[2] || '贴图版式总览';
+// 张数不再固定 9，列数跟着可调：--cols=5 出一行 5 张，免得多出来的张数把图撑得很高。
+// 总览截图脚本用 --window-size 传的宽度要和下面的 COLW + 两侧 44px 内边距对齐（见 总览截图.sh）。
+const colsArg = (argv.find(a => a.startsWith('--cols=')) || '').split('=')[1];
+const COLS = Math.max(1, Math.min(8, parseInt(colsArg, 10) || 3));
+const COLW = COLS * 354 + (COLS - 1) * (COLS >= 5 ? 20 : 28);
 
 if (!fs.existsSync(srcFile)) throw new Error('数据源不存在: ' + srcFile);
 const rows = JSON.parse(fs.readFileSync(srcFile, 'utf8'));
@@ -62,11 +67,11 @@ const html = `<!DOCTYPE html>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #EDF1F6; padding: 44px;
          font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
-  h1, .sub { max-width: 1116px; margin: 0 auto; }
+  h1, .sub { max-width: ${COLW}px; margin: 0 auto; }
   h1 { font-size: 26px; color: #10294B; margin-bottom: 8px; }
   .sub { font-size: 15px; color: #7A8798; margin-bottom: 30px; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px;
-          max-width: 1116px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(${COLS}, 1fr); gap: ${COLS >= 5 ? 20 : 28}px;
+          max-width: ${COLW}px; margin: 0 auto; }
   figure { display: flex; flex-direction: column; gap: 10px; }
   img { width: 100%; height: auto; display: block; border-radius: 12px; background: #fff;
         box-shadow: 0 8px 22px rgba(16,24,40,.14); }
