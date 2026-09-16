@@ -1159,6 +1159,87 @@ function contentCover(d, top, bottom, t) {
   return g + `</g>`;
 }
 
+/* ---- circle：正负形圆形分割 ----
+   一个大圆色块把版面切成「圆内 / 圆外」：圆内压主信息（反白），圆外四角压角注。
+   圆直径与角注宽度这一段公式必须和 贴图模板.html 的 render() 逐字对齐 ——
+   CSS 里表达不出「横向出血 + 竖向不顶出内容区 + 四角还得留得下人」，
+   只能两边各算一次，所以两边都写了同一组 NOTE_H / PAD / CW_MIN / dx0。 */
+const INNER_W = 434;   // 圆内文字块宽度（= HTML 里 .cc-in 的 width，658 的 66%）
+function contentCircle(d, top, bottom, t) {
+  const NOTE_H = 78, PAD = 8, CW_MIN = 150;
+  const dx0 = W / 2 - CX;                     // 329：角注外边界到圆心
+  const boxH = bottom - top;
+  const ry = Math.max(0, boxH / 2 - NOTE_H);
+  const rCap = Math.sqrt((dx0 - CW_MIN) * (dx0 - CW_MIN) + ry * ry) - PAD;
+  // 横向顶到卡片内边距之外（758）或画布边（810）、竖向不顶出内容区、再受半径上限约束
+  const D = Math.round(Math.min(bleedBox(d).w, boxH, rCap * 2));
+  const cw = Math.round(dx0 - Math.sqrt(Math.max(0, (D / 2 + PAD) * (D / 2 + PAD) - ry * ry)));
+  const cx = W / 2, cy = (top + bottom) / 2, r = D / 2;
+
+  const KICK = 22, KH = 30, KGAP = 18, WLH = 1.1, NGAP = 20, NOTE = 21, NLH = 1.55;
+  const UNIT = 30, UGAP = 12;
+  const unitW = d.ccUnit ? textW(d.ccUnit, UNIT) + UGAP : 0;
+  // 主词 + 单位要一起塞进圆内宽度（和 HTML 里那段 while 同一条规则：每次减 2px，下限 56）
+  let ws = 118;
+  while (ws > 56 && textW(d.ccWord || '', ws) + unitW > INNER_W) ws -= 2;
+  const wordW = textW(d.ccWord || '', ws);
+
+  const wordH = ws * WLH;
+  const noteLines = d.ccNote ? wrapText(d.ccNote, NOTE, INNER_W) : [];
+  const noteH = noteLines.length ? NGAP + noteLines.length * NOTE * NLH : 0;
+  const blockH = (d.ccKick ? KH + KGAP : 0) + wordH + noteH;
+  let y = cy - blockH / 2;
+
+  let g = `<g id="内容区-正负形圆">`;
+  g += `<circle cx="${cx}" cy="${R(cy)}" r="${R(r)}" fill="${t.card}"/>`;
+
+  if (d.ccKick) {
+    g += T({ x: cx, cy: y + KH / 2, s: d.ccKick, size: KICK, fill: '#FFFFFF', weight: 700, ls: 3, opacity: 0.86 });
+    y += KH + KGAP;
+  }
+  // 主词和单位共用一条基线。T() 收的是「视觉中心」而不是基线，
+  // 所以单位要把中心按自己的字号回退回去，否则两个字号的脚不在一条线上。
+  const wCenter = y + wordH / 2;
+  const baseY = wCenter + ws * 0.36;
+  const wordX = cx - (wordW + unitW) / 2;
+  g += T({ x: wordX, cy: wCenter, s: d.ccWord || '', size: ws, fill: '#FFFFFF', weight: 900, family: TITLE_FONT, anchor: 'start' });
+  if (d.ccUnit) {
+    g += T({ x: wordX + wordW + UGAP, cy: baseY - UNIT * 0.36, s: d.ccUnit, size: UNIT,
+             fill: '#FFFFFF', weight: 700, anchor: 'start', opacity: 0.9 });
+  }
+  y += wordH;
+  noteLines.forEach((ln, i) => {
+    g += T({ x: cx, cy: y + NGAP + i * NOTE * NLH + NOTE * NLH / 2, s: ln, size: NOTE,
+             fill: '#FFFFFF', anchor: 'middle', opacity: 0.82 });
+  });
+
+  // 圆外四角压角注（负形）。文字左边留 40px 给色条 —— 四种角色条都在文字左侧，
+  // 和 CSS 里 .h / .p 的 margin-left:40px 对应；右侧两个角注再右缩 12px
+  // 让开卡片右上角的账号角标（和 CSS 里 .tr / .br 的 right:12px 一致）。
+  const CH = 21, CLH = 1.3, PGAP = 6, P = 15, PLH = 1.45, BAR = 40, RINSET = 12;
+  (d.ccCorners || []).forEach(c => {
+    const pos = c.pos || 'tl';
+    const isTop = pos[0] === 't', isRight = pos[1] === 'r';
+    const usable = cw - BAR;
+    const hSize = fitSize(c.h || '', CH, usable, 0, 15);
+    const pLines = c.p ? wrapText(c.p, P, usable) : [];
+    const hH = c.h ? CH * CLH : 0;
+    const pH = pLines.length ? (c.h ? PGAP : 0) + pLines.length * P * PLH : 0;
+    const y0 = isTop ? top : bottom - hH - pH;
+    const anchor = isRight ? 'end' : 'start';
+    const tx = isRight ? CX + CW - RINSET : CX + BAR;
+    if (c.h) {
+      g += rect(isRight ? CX + CW - RINSET - cw : CX, y0 + hH / 2 - 4, 30, 8, t.badge);
+      g += T({ x: tx, cy: y0 + hH / 2, s: c.h, size: hSize, fill: t.title, weight: 700, family: TITLE_FONT, anchor });
+    }
+    pLines.forEach((ln, i) => {
+      g += T({ x: tx, cy: y0 + hH + PGAP + i * P * PLH + P * PLH / 2, s: ln, size: P, fill: t.axis, anchor });
+    });
+  });
+
+  return g + `</g>`;
+}
+
 const CONTENT = {
   vs: contentVs,
   cards: contentCards,
@@ -1167,6 +1248,7 @@ const CONTENT = {
   bigword: contentBigword,
   band: contentBand,
   cover: contentCover,
+  circle: contentCircle,
   photo: contentPhoto,
   photoFocus: contentFocus,
   duo: contentDuo,
@@ -1183,10 +1265,10 @@ const unknownLayouts = new Set();
 
 function buildSVG(d) {
   const t = THEMES[d.theme] || THEMES.blue;
-  // cover 自带整版排版（顶部小标签 + 大字 + 底部数字带），不共用顶部双行标题。
-  // 传 bottom = CARD_TOP - 26，让下面算出来的 top 正好落在 CARD_TOP（76），
+  // cover / circle 自带整版排版（顶部小标签 + 大字 + 底部数字带，或大圆 + 四角角注），
+  // 不共用顶部双行标题。传 bottom = CARD_TOP - 26，让下面算出来的 top 正好落在 CARD_TOP（76），
   // 和 HTML 里 .poster.own-title .content { margin-top: 0 } 对齐。
-  const ownShell = d.layout === 'cover';
+  const ownShell = d.layout === 'cover' || d.layout === 'circle';
   const tb = ownShell ? { svg: '', bottom: CARD_TOP - 26 } : titleBlock(d, t);
   const fb = footBlock(d, t);
   const top = tb.bottom + 26;

@@ -65,6 +65,37 @@ window.addEventListener('load',function(){setTimeout(function(){
       +' 编号='+cs('.ly-band .bd .n','fontSize')+' 标题='+cs('.ly-band .bd .t b','fontSize')
       +' 零间距='+(bs.length>1?Math.round(bs[1].getBoundingClientRect().top-bs[0].getBoundingClientRect().bottom):'-'));
   }
+  // circle：圆要真的是正圆、要出血、四角角注不能压进圆里。
+  // 角注量的是文字（Range）而不是容器盒子 —— 容器是定宽块，
+  // 量盒子会把「盒子宽但那里没写字」的地方也算成压到圆里，白白误报。
+  if(document.querySelector('.ly-circle')){
+    function tRect(el){
+      var rg=document.createRange(); rg.selectNodeContents(el);
+      var b=rg.getBoundingClientRect();
+      return (b.width||b.height)?b:el.getBoundingClientRect();
+    }
+    var disc=document.querySelector('.ly-circle .cc-disc');
+    var dr=disc.getBoundingClientRect();
+    var ccx=dr.left+dr.width/2, ccy=dr.top+dr.height/2, rr=dr.width/2;
+    var worst=Infinity, who='-';
+    document.querySelectorAll('.ly-circle .cc-corner .h .t, .ly-circle .cc-corner .p').forEach(function(el){
+      var b=tRect(el);
+      // 矩形上离圆心最近的那一点，到圆边的距离；>=0 才是"完全在圆外"
+      var nx=Math.max(b.left,Math.min(ccx,b.right)), ny=Math.max(b.top,Math.min(ccy,b.bottom));
+      var gap=Math.hypot(nx-ccx,ny-ccy)-rr;
+      if(gap<worst){worst=gap;who=(el.closest('.cc-corner').className||'').split(' ').pop();}
+    });
+    var cr2=document.querySelector('.content').getBoundingClientRect();
+    out.push('圆直径='+Math.round(dr.width)+'x'+Math.round(dr.height)
+      +' 圆心='+Math.round(ccx)+','+Math.round(ccy)
+      +' 圆出血(左/右)='+Math.round(cr2.left-dr.left)+'/'+Math.round(dr.right-cr2.right)
+      +' 角注离圆='+Math.round(worst)+'px('+who+')'
+      +' 角注宽='+cs('.ly-circle .cc-corner','width')
+      +' 主词='+cs('.ly-circle .cc-word','fontSize')+'/'+cs('.ly-circle .cc-word','fontWeight')
+      +' 单位='+cs('.ly-circle .cc-unit','fontSize')
+      +' 角注数='+document.querySelectorAll('.ly-circle .cc-corner').length
+      +' 共用标题='+cs('.title','display'));
+  }
   // 满幅外壳：量「白卡真的没了吗、底图真的解码了吗」。
   // naturalWidth 是关键 —— 只看 src 非空会把 404 的破图也判成"有图"。
   if(document.querySelector('.poster.full')){

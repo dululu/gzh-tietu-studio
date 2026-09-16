@@ -575,6 +575,62 @@
   .ly-cover .cv-keys .ck.warn .k { color: #CE4038; }
   .ly-cover .cv-keys .ck .v { font-size: 18px; line-height: 1.4; color: var(--axis); }
 
+  /* ---------- circle：正负形圆形分割 ----------
+     一个大圆色块把版面切成「圆内 / 圆外」两区：圆内压主信息（反白），圆外四角压角注。
+     圆水平顶到卡片内边距之外（满幅时顶到画布边）、竖直被内容区夹住，所以永远是正圆。
+     直径 --ccd 和角注宽 --ccw 都由 render() 量完实际尺寸后写回来 —— CSS 里
+     同时看宽和高做不出这个值（见 贴图排版手册 第 24 条）。
+     circle 和 cover 一样自带整版排版：大圆要整版的高度，留着共用标题就放不下。 */
+  .ly-circle { flex: 1; min-height: 0; position: relative; }
+  .ly-circle .cc-disc {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: var(--ccd, 600px); height: var(--ccd, 600px);
+    border-radius: 50%; background: var(--card);
+  }
+  /* 圆内主信息：kick → 主词(+单位) → 说明。宽度写死 434（= 内容区 658 的 66%），
+     导出SVG.js 里 INNER_W 是同一个数，改一处必须改两处。 */
+  .ly-circle .cc-in {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 434px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .ly-circle .cc-kick { flex: none; font-size: 22px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,.86); }
+  /* 主词和单位同一基线（baseline 对齐），所以单位不写 padding 也不会掉下去 */
+  .ly-circle .cc-word-line {
+    flex: none; width: 100%; margin-top: 18px;
+    display: flex; align-items: baseline; justify-content: center; gap: 12px;
+  }
+  .ly-circle .cc-word {
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+    font-weight: 900; font-size: 118px; line-height: 1.1; letter-spacing: -.01em; color: #FFFFFF;
+  }
+  .ly-circle .cc-unit { flex: none; font-size: 30px; font-weight: 700; color: rgba(255,255,255,.9); }
+  .ly-circle .cc-note { flex: none; margin-top: 20px; font-size: 21px; line-height: 1.55; color: rgba(255,255,255,.82); }
+
+  /* 圆外压角注：贴在内容区四角。宽度 --ccw 由「圆越大、四角越小」算出来（默认 200px）。
+     右上角默认下移 20px 避开卡片右上角的账号角标。
+     小标题的色条是真实元素 <i> 而不是 ::before —— fitText 量的是元素内容的 Range，
+     ::before 不进 DOM 但会进 Range 的包围盒，量出来会莫名多 40px。 */
+  .ly-circle .cc-corner { position: absolute; width: var(--ccw, 200px); }
+  .ly-circle .cc-corner .h,
+  .ly-circle .cc-corner .p { width: calc(100% - 40px); margin-left: 40px; }
+  .ly-circle .cc-corner .h {
+    position: relative;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 21px; line-height: 1.3; color: var(--title);
+  }
+  .ly-circle .cc-corner .h i {
+    position: absolute; left: -40px; top: 50%; margin-top: -4px;
+    width: 30px; height: 8px; background: var(--badge);
+  }
+  .ly-circle .cc-corner .p { margin-top: 6px; font-size: 15px; line-height: 1.45; color: var(--axis); }
+  .ly-circle .cc-corner.tl { left: 0; top: 0; }
+  .ly-circle .cc-corner.bl { left: 0; bottom: 0; }
+  /* 右侧两个角注右缩 12px：卡片右上角的账号角标占 88px，它的左边正好压进内容区 12px。
+     缩 12px 让开后，角注的文字右边界刚好贴住角标左边 —— 比「往下让」好，
+     往下让会把角注推得离圆更近，四角本来就不宽裕。 */
+  .ly-circle .cc-corner.tr { right: 12px; top: 0; text-align: right; }
+  .ly-circle .cc-corner.br { right: 12px; bottom: 0; text-align: right; }
+
   .footnote { flex: none; margin-top: 18px; font-size: 16px; line-height: 1.8; color: var(--foot); }
   .footnote.empty { display: none; }
 
@@ -637,6 +693,7 @@
       <option value="bigword">巨型字主视觉（字压色块）</option>
       <option value="band">横向色带分割（满幅撞色）</option>
       <option value="cover">满幅封面（底图压大字）</option>
+      <option value="circle">正负形圆形分割（大圆压字）</option>
     </select>
     <select id="themePick"></select>
     <span class="swatches" id="swatches"></span>
@@ -850,6 +907,25 @@ const LAYOUTS = {
       ${d.cvNote ? `<div class="cv-note">${d.cvNote}</div>` : ''}
       ${(d.cvKeys || []).length ? `<div class="cv-keys bleed">${d.cvKeys.map(k => `
         <div class="ck${k.warn ? ' warn' : ''}"><span class="k">${k.k || ''}</span><span class="v">${k.v || ''}</span></div>`).join('')}</div>` : ''}
+    </div>`,
+
+  /* circle 正负形圆形分割：
+     一个深色大圆把版面切成「圆内 / 圆外」。圆内（正形）压主信息、反白；
+     圆外四角（负形）压角注。圆的大小由 render() 量出来写进 --ccd —— 横向出血、
+     竖向不顶出内容区，两个约束 CSS 单独拿不出来。
+     和 cover 一样自带整版排版，所以 title1 / title2 / deck 会被忽略。 */
+  circle: d => `<div class="ly-circle">
+      <div class="cc-disc bleed"></div>
+      <div class="cc-in">
+        ${d.ccKick ? `<div class="cc-kick">${d.ccKick}</div>` : ''}
+        <div class="cc-word-line"><span class="cc-word">${d.ccWord || ''}</span>${d.ccUnit ? `<span class="cc-unit">${d.ccUnit}</span>` : ''}</div>
+        ${d.ccNote ? `<div class="cc-note">${d.ccNote}</div>` : ''}
+      </div>
+      ${(d.ccCorners || []).map(c => `
+        <div class="cc-corner ${c.pos || 'tl'}">
+          ${c.h ? `<div class="h"><i></i><span class="t">${c.h}</span></div>` : ''}
+          ${c.p ? `<div class="p">${c.p}</div>` : ''}
+        </div>`).join('')}
     </div>`
 };
 
@@ -992,11 +1068,12 @@ function render(injected) {
   const themeName = THEMES[d.theme] ? d.theme : DEFAULT_THEME;
   const t = applyTheme(themeName);
 
-  // 满幅外壳：先定壳、再灌内容。cover 自带整版排版，强制满幅并藏掉共用的双行标题。
-  // 老版式默认 shell:"card"，这一整段对它们不产生任何影响。
+  // 满幅外壳：先定壳、再灌内容。cover / circle 自带整版排版（藏掉共用的双行标题）。
+  // 「自带整版」和「没有白卡」是两件事：cover 的底图必须铺满，所以它连满幅一起自带；
+  // circle 只是要整版的高度来放大圆，白卡留着更好看，满幅仍由 shell:"full" 决定。
   const posterEl = document.getElementById('poster');
-  const ownShell = d.layout === 'cover';
-  const fullShell = d.shell === 'full' || ownShell;
+  const ownShell = d.layout === 'cover' || d.layout === 'circle';
+  const fullShell = d.shell === 'full' || d.layout === 'cover';
   posterEl.classList.toggle('full', fullShell);
   posterEl.classList.toggle('own-title', ownShell);
   posterEl.classList.toggle('hasbg', fullShell && !!d.bg);
@@ -1052,6 +1129,40 @@ function render(injected) {
   fitText(content.querySelector('.ly-cover .cv-tag'), 22, 16);
   content.querySelectorAll('.ly-cover .cv-keys .ck .k').forEach(el => fitText(el, 40, 22));
   content.querySelectorAll('.ly-cover .cv-keys .ck .v').forEach(el => fitText(el, 18, 12));
+
+  // circle：圆的直径和角注的宽度互为约束 —— 圆越大四角越小，都要量完实际尺寸才算得出来。
+  // 这一段必须和 导出SVG.js 的 contentCircle 用同一套公式，否则 PNG 与 SVG 会悄悄不一样。
+  const ccHost = content.querySelector('.ly-circle');
+  if (ccHost) {
+    const box = ccHost.getBoundingClientRect();
+    const NOTE_H = 78;      // 角注按「小标题一行 + 说明两行」估高；估大只会把角注留得更窄（安全方向）
+    const PAD = 8;          // 角注离圆边的呼吸量
+    const CW_MIN = 150;     // 角注最窄 150px（一行约放 7 个汉字，再窄就不成句了）
+    const dx0 = 405 - 76;   // 角注外边界到圆心的水平距离（内容区左边界 76、圆心在画布中轴 405）
+    const ry = Math.max(0, box.height / 2 - NOTE_H);   // 角注内边界到圆心的竖向距离
+    // 半径上限：太瘦的角注没法用，所以先把半径压到「角注留够 CW_MIN 时刚好不碰圆」
+    const rCap = Math.sqrt((dx0 - CW_MIN) * (dx0 - CW_MIN) + ry * ry) - PAD;
+    // 横向顶到卡片内边距之外（658 + 50×2 = 758）/ 顶到画布边（658 + 76×2 = 810），
+    // 竖向不能顶出内容区，再受上面的半径上限约束 —— 三者取小，圆永远是正圆
+    const d0 = Math.round(Math.min(box.width + (fullShell ? 152 : 100), box.height, rCap * 2));
+    ccHost.style.setProperty('--ccd', d0 + 'px');
+    const reach = Math.sqrt(Math.max(0, (d0 / 2 + PAD) * (d0 / 2 + PAD) - ry * ry));
+    ccHost.style.setProperty('--ccw', Math.round(dx0 - reach) + 'px');
+
+    // 主词 + 单位要一起塞进圆内宽度：按 2px 一档缩，和 导出SVG.js 的 contentCircle 同一条规则
+    const ccLine = ccHost.querySelector('.cc-word-line');
+    const ccWord = ccLine.querySelector('.cc-word');
+    const ccUnit = ccLine.querySelector('.cc-unit');
+    const avail = ccLine.clientWidth || 434;
+    let ws = 118;
+    const unitW = ccUnit ? measureText(ccUnit) + 12 : 0;
+    ccWord.style.whiteSpace = 'nowrap';
+    ccWord.style.fontSize = ws + 'px';
+    while (ws > 56 && measureText(ccWord) + unitW > avail) { ws -= 2; ccWord.style.fontSize = ws + 'px'; }
+    // 角注小标题保持单行；量的是 .t（真文字）而不是 .h —— .h 里那个绝对定位的色条
+    // 虽然不进 DOM 也会进 Range 的包围盒，量 .h 会莫名多出 40px
+    ccHost.querySelectorAll('.cc-corner .h .t').forEach(el => fitText(el, 21, 15));
+  }
 
   chartHost = document.getElementById('chartBox');
   if (chartHost) {
