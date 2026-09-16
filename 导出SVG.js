@@ -898,11 +898,126 @@ function contentHero(d, top, bottom, t) {
   return svg + g + `</g>`;
 }
 
+// ---- bigword：巨型字主视觉（文字当图形 + 满幅色块垫 + -3° 破网格） ----
+function contentBigword(d, top, bottom, t) {
+  const titleH = 31 * 1.4;
+  const keys = (d.bwKeys || []).slice(0, 3);
+  const noteSize = 24, keyK = 30, keyV = 18, keyPadX = 12, keyPadY = 15, keyGap = 14;
+  const keyW = keys.length ? (CW - keyGap * (keys.length - 1)) / keys.length : 0;
+  const keyAvail = keyW - keyPadX * 2;
+  const noteLines = d.bwNote ? wrapText(d.bwNote, noteSize, CW) : [];
+  const noteH = noteLines.length ? 26 + noteLines.length * noteSize * 1.55 : 0;
+  let keyH = 0;
+  const kBlocks = keys.map(k => {
+    const vL = wrapText(k.v || '', keyV, keyAvail);
+    keyH = Math.max(keyH, keyPadY * 2 + keyK + 9 + vL.length * keyV * 1.35);
+    return vL;
+  });
+  const keysH = keys.length ? 22 + keyH : 0;
+
+  const stageTop = top + (d.bwTitle ? titleH : 0);
+  const stageH = Math.max(120, bottom - noteH - keysH - stageTop);
+
+  // 巨型字宽度自适应：4 个字会缩到 ~165px；字距 -0.032em 与 HTML 同步
+  const wordStr = String(d.bwWord || '');
+  const nCh = [...wordStr].length;
+  const uN = d.bwUnit ? [...String(d.bwUnit)].length : 0;
+  const textOnly = ws => textW(wordStr, ws) - 0.032 * ws * Math.max(0, nCh - 1);
+  const unitExtra = ws => (uN ? (0.26 * uN + 0.45 * 0.26) * ws : 0);
+  let ws = 210;
+  while (ws > 110 && textOnly(ws) + unitExtra(ws) > CW - 24) ws -= 2;
+
+  const boxH = ws * 0.96;
+  const boxTop = stageTop + (stageH - boxH) / 2;
+  const boxBottom = boxTop + boxH;
+  const cx = W / 2, cy = boxTop + boxH / 2;
+
+  let g = `<g id="内容区-巨型字">`;
+  if (d.bwTitle) g += T({ x: CX, cy: top + titleH / 2, s: d.bwTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+  // 满幅色块垫：左右顶到卡片内边距外（PAD .. W-PAD），字的下半段压在它上面
+  g += rect(PAD, boxBottom - 0.40 * ws, W - PAD * 2, 0.34 * ws, t.soft);
+  g += `<g transform="rotate(-3 ${R(cx)} ${R(cy)})">`
+    + T({ x: cx, cy, s: wordStr, size: ws, fill: t.card, weight: 900, family: TITLE_FONT, ls: -0.032 * ws });
+  if (d.bwUnit) {
+    const uSize = 0.26 * ws;
+    // 与 HTML 一致：小单位跟大字共用基线，接在字尾
+    g += T({
+      x: cx - (textOnly(ws) + unitExtra(ws)) / 2 + textOnly(ws) + 0.45 * uSize + uSize * uN / 2,
+      cy: cy + ws * 0.36 - uSize * 0.36, s: d.bwUnit, size: uSize, fill: t.card, weight: 700
+    });
+  }
+  g += `</g>`;
+
+  if (noteLines.length) {
+    const ny = bottom - keysH - noteH + 26;
+    noteLines.forEach((ln, k) => {
+      g += T({ x: W / 2, cy: ny + k * noteSize * 1.55 + noteSize * 1.55 / 2, s: ln, size: noteSize, fill: t.axis, weight: 500 });
+    });
+  }
+  keys.forEach((k, i) => {
+    const x = CX + i * (keyW + keyGap);
+    const warn = !!k.warn;
+    const y = bottom - keyH;
+    g += rect(x, y, keyW, keyH, warn ? '#FCEDEA' : t.soft, { rx: 10 })
+      + T({ x: x + keyW / 2, cy: y + keyPadY + keyK / 2, s: k.k, size: keyK, fill: warn ? '#CE4038' : t.card, weight: 800, ls: -1 });
+    let vy = y + keyPadY + keyK + 9;
+    kBlocks[i].forEach((ln, j) => {
+      g += T({ x: x + keyW / 2, cy: vy + j * keyV * 1.35 + keyV * 1.35 / 2, s: ln, size: keyV, fill: t.axis });
+    });
+  });
+  return g + `</g>`;
+}
+
+// ---- band：横向色带分割（满幅出血 · 零间距 · 色带等高） ----
+function contentBand(d, top, bottom, t) {
+  const titleH = 31 * 1.4;
+  const rows = d.bands || [];
+  const n = rows.length || 1;
+  const stackTop = top + (d.bandTitle ? titleH + 18 : 0);
+  const stackH = Math.max(120, bottom - stackTop);
+  const bandH = stackH / n;
+  const numSize = 76, hSize = 30, pSize = 20, numW = 112, gap = 24;
+  const bodyX = CX + numW + gap;
+  const bodyAvail = CW - numW - gap;
+
+  let g = `<g id="内容区-色带分割">`;
+  if (d.bandTitle) g += T({ x: CX, cy: top + titleH / 2, s: d.bandTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+
+  rows.forEach((b, i) => {
+    const y = stackTop + i * bandH;
+    const tone = b.warn ? 'warn' : (b.tone || (i % 2 === 0 ? 'dark' : 'soft'));
+    const bg = tone === 'warn' ? '#CE4038' : tone === 'dark' ? t.card : tone === 'soft' ? t.soft : '#FFFFFF';
+    const dark = tone === 'dark' || tone === 'warn';
+    // 色带左右出血到卡片内边距之外，彼此零间距 —— 分割本身就是装饰
+    g += rect(PAD, y, W - PAD * 2, bandH, bg);
+    if (tone === 'plain') {
+      // 对齐 HTML 的 inset box-shadow：上下各一条 2px 细线画在带子内侧
+      g += line(PAD, y + 1, W - PAD, y + 1, t.softLine, 2)
+        + line(PAD, y + bandH - 1, W - PAD, y + bandH - 1, t.softLine, 2);
+    }
+    g += T({ x: CX + numW / 2, cy: y + bandH / 2, s: b.n || String(i + 1).padStart(2, '0'), size: numSize, fill: dark ? '#FFFFFF' : t.card, weight: 900, ls: -4 });
+    const hLines = wrapText(b.h || '', hSize, bodyAvail);
+    const pLines = b.p ? wrapText(b.p, pSize, bodyAvail) : [];
+    const textH = hLines.length * hSize * 1.25 + (pLines.length ? 6 + pLines.length * pSize * 1.5 : 0);
+    let yy = y + bandH / 2 - textH / 2;
+    hLines.forEach((ln, k) => {
+      g += T({ x: bodyX, cy: yy + k * hSize * 1.25 + hSize * 1.25 / 2, s: ln, size: hSize, fill: dark ? '#FFFFFF' : t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
+    });
+    yy += hLines.length * hSize * 1.25 + 6;
+    pLines.forEach((ln, k) => {
+      g += T({ x: bodyX, cy: yy + k * pSize * 1.5 + pSize * 1.5 / 2, s: ln, size: pSize, fill: dark ? '#FFFFFF' : t.axis, anchor: 'start', opacity: dark ? 0.88 : undefined });
+    });
+  });
+  return g + `</g>`;
+}
+
 const CONTENT = {
   vs: contentVs,
   cards: contentCards,
   steps: contentSteps,
   hero: contentHero,
+  bigword: contentBigword,
+  band: contentBand,
   photo: contentPhoto,
   photoFocus: contentFocus,
   duo: contentDuo,

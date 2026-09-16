@@ -23,6 +23,8 @@ window.addEventListener('load',function(){setTimeout(function(){
     var r=el.getBoundingClientRect();
     if(r.width===0&&r.height===0)return;
     var cls=(typeof el.className==='string'&&el.className)?el.className.split(' ')[0]:el.tagName;
+    // .bleed = 设计内的满幅出血（巨型字的色块垫、横向色带都左右顶到卡片内边距之外），不算越界
+    if(el.classList&&el.classList.contains('bleed'))return;
     // 容差 2px：倾斜的贴纸和 VS 徽章外环本来就会稍微出血，算设计内
     if(r.bottom>cb.bottom+2||r.right>cb.right+2||r.left<cb.left-2)
       bad.push(cls+'[L'+Math.round(r.left-cb.left)+' R'+Math.round(r.right-cb.right)+' B'+Math.round(r.bottom-cb.bottom)+']');

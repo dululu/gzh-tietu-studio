@@ -417,6 +417,90 @@
   .ly-hero .hi b { display: block; margin-top: 9px; font-family: "Songti SC", "STSong", "Noto Serif SC", serif; font-size: 22px; font-weight: 700; color: var(--title); line-height: 1.3; }
   .ly-hero .hi p { margin-top: 6px; font-size: 17px; color: var(--axis); line-height: 1.45; }
 
+  /* ===== 版式 bigword：巨型字主视觉 =====
+     学自「视觉海报精选案例」里的「文字图形化」——字本身当画面主体，不做成配文。
+     三条落地：① 字号 200px+ 直接吃掉整行、② 字的下半段压一条满幅色块垫（撞色）、
+     ③ 整块转 -3° 破网格（全图角度的第三档，只有 -7°/-4°/-3°）。 */
+  .ly-bigword { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-bigword .bw-title {
+    flex: none; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 31px; color: var(--title); letter-spacing: 1px;
+  }
+  .ly-bigword .bw-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+  /* 宽度必须显式撑满，否则 fitText 拿到的是 shrink-to-fit 宽度，4 个字不会缩 */
+  .ly-bigword .bw-box { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
+  .ly-bigword .bw-word {
+    position: relative; z-index: 1; white-space: nowrap;
+    font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 900; font-size: 210px; line-height: .96; letter-spacing: -0.032em;
+    color: var(--card); transform: rotate(-3deg);
+  }
+  /* 色块垫：左右各出血 50px（正好顶到卡片内边距外），高与位置都跟着巨型字字号走 */
+  .ly-bigword .bw-pad {
+    position: absolute; z-index: 0; left: -50px; right: -50px;
+    bottom: calc(var(--wsz, 210px) * 0.06);
+    height: calc(var(--wsz, 210px) * 0.34);
+    background: var(--soft);
+  }
+  .ly-bigword .bw-unit { font-size: .26em; font-weight: 700; letter-spacing: 0; margin-left: .45em; }
+  .ly-bigword .bw-note {
+    flex: none; margin-top: 26px; text-align: center;
+    font-size: 24px; line-height: 1.55; color: var(--axis); font-weight: 500;
+  }
+  .ly-bigword .bw-keys { flex: none; margin-top: 22px; display: flex; gap: 14px; }
+  .ly-bigword .bwk { flex: 1; min-width: 0; border-radius: 10px; background: var(--soft); padding: 15px 12px 16px; text-align: center; }
+  .ly-bigword .bwk .k { display: block; font-size: 30px; font-weight: 800; color: var(--card); line-height: 1; letter-spacing: -1px; }
+  .ly-bigword .bwk .v { display: block; margin-top: 9px; font-size: 18px; color: var(--axis); line-height: 1.35; }
+  .ly-bigword .bwk.warn { background: #FCEDEA; }
+  .ly-bigword .bwk.warn .k { color: #CE4038; }
+
+  /* ===== 版式 band：横向色带分割 =====
+     学自「9 组版式实验」的水平分割 +「排版中的图形构成」的「主标题放大撑满画面」
+     —— 色带左右出血、彼此零间距，分割本身就是装饰，不靠圆角/投影/额外元素。
+     色带高度等分，所以 2–4 条都撑满；条数不同就只换色，不动骨架。 */
+  .ly-band { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-band .bd-title {
+    flex: none; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 31px; color: var(--title); letter-spacing: 1px;
+  }
+  .ly-band .bd-stack { flex: 1; min-height: 0; margin-top: 18px; display: flex; flex-direction: column; }
+  .ly-band .bd {
+    flex: 1; min-height: 0; overflow: hidden;
+    display: flex; align-items: center; gap: 24px;
+    margin: 0 -50px; padding: 20px 50px;
+  }
+  .ly-band .bd .n {
+    flex: none; width: 112px; text-align: center;
+    font-size: 76px; font-weight: 900; line-height: 1; letter-spacing: -4px;
+  }
+  .ly-band .bd .t { flex: 1; min-width: 0; }
+  .ly-band .bd .t b {
+    display: block; font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+    font-weight: 700; font-size: 30px; line-height: 1.25;
+  }
+  .ly-band .bd .t p { margin-top: 6px; font-size: 20px; line-height: 1.5; }
+  /* 三档色带：深（主题深色反白）/ 浅（主题浅色）/ 留白（纯白 + 上下细线当分隔）
+     默认深↔浅交替，首尾同深、中段浅，奇数条时天然收口 */
+  .ly-band .bd.dark { background: var(--card); }
+  .ly-band .bd.dark .n { color: #FFFFFF; }
+  .ly-band .bd.dark .t b { color: #FFFFFF; }
+  .ly-band .bd.dark .t p { color: rgba(255,255,255,.88); }
+  .ly-band .bd.soft { background: var(--soft); }
+  .ly-band .bd.soft .n { color: var(--card); }
+  .ly-band .bd.soft .t b { color: var(--title); }
+  .ly-band .bd.soft .t p { color: var(--axis); }
+  /* 留白带：纯白 + 上下细线。用 box-shadow 画线而不是 border —— border 会让这条带子
+     比另两条高 4px，破坏「色带等高」；box-shadow 不参与布局，高度永远一致 */
+  .ly-band .bd.plain { background: #FFFFFF; box-shadow: inset 0 2px 0 var(--soft-line), inset 0 -2px 0 var(--soft-line); }
+  .ly-band .bd.plain .n { color: var(--card); }
+  .ly-band .bd.plain .t b { color: var(--title); }
+  .ly-band .bd.plain .t p { color: var(--axis); }
+  /* 警示：固定警示红，刻意不跟主题色走（与 cards 的语言一致） */
+  .ly-band .bd.warn { background: #CE4038; box-shadow: none; }
+  .ly-band .bd.warn .n { color: #FFFFFF; }
+  .ly-band .bd.warn .t b { color: #FFFFFF; }
+  .ly-band .bd.warn .t p { color: rgba(255,255,255,.9); }
+
   /* ---------- 固定件 4：底部来源 ---------- */
   .footnote { flex: none; margin-top: 18px; font-size: 16px; line-height: 1.8; color: var(--foot); }
   .footnote.empty { display: none; }
@@ -475,6 +559,8 @@
       <option value="cards">编号行动卡（可标警示）</option>
       <option value="steps">四步阶梯（末级反白）</option>
       <option value="hero">大图压标题 + 要点条</option>
+      <option value="bigword">巨型字主视觉（字压色块）</option>
+      <option value="band">横向色带分割（满幅撞色）</option>
     </select>
     <select id="themePick"></select>
     <span class="swatches" id="swatches"></span>
@@ -653,6 +739,29 @@ const LAYOUTS = {
       </div>
       <div class="hero-body">${(d.heroItems || []).map((it, i) => `
         <div class="hi"><span class="k">${String(i + 1).padStart(2, '0')}</span><b>${it.h || ''}</b>${it.p ? `<p>${it.p}</p>` : ''}</div>`).join('')}</div>
+    </div>`,
+
+  /* ---- 以下 2 个来自「视觉海报精选案例」的学习，同样是纯增量 ---- */
+  bigword: d => `<div class="ly-bigword">
+      ${d.bwTitle ? `<div class="bw-title">${d.bwTitle}</div>` : ''}
+      <div class="bw-stage">
+        <div class="bw-box">
+          <span class="bw-pad bleed"></span>
+          <div class="bw-word"><span class="bw-t">${d.bwWord || ''}</span>${d.bwUnit ? `<span class="bw-unit">${d.bwUnit}</span>` : ''}</div>
+        </div>
+      </div>
+      ${d.bwNote ? `<div class="bw-note">${d.bwNote}</div>` : ''}
+      ${(d.bwKeys || []).length ? `<div class="bw-keys">${(d.bwKeys || []).map(k => `
+        <div class="bwk${k.warn ? ' warn' : ''}"><span class="k">${k.k || ''}</span><span class="v">${k.v || ''}</span></div>`).join('')}</div>` : ''}
+    </div>`,
+
+  band: d => `<div class="ly-band">
+      ${d.bandTitle ? `<div class="bd-title">${d.bandTitle}</div>` : ''}
+      <div class="bd-stack">${(d.bands || []).map((b, i) => `
+        <div class="bd bleed ${b.tone || (i % 2 === 0 ? 'dark' : 'soft')}${b.warn ? ' warn' : ''}">
+          <span class="n">${b.n || String(i + 1).padStart(2, '0')}</span>
+          <div class="t"><b>${b.h || ''}</b>${b.p ? `<p>${b.p}</p>` : ''}</div>
+        </div>`).join('')}</div>
     </div>`
 };
 
@@ -830,6 +939,15 @@ function render(injected) {
   content.querySelectorAll('.ly-cards .cd .hd b').forEach(el => fitText(el, 28, 18));
   content.querySelectorAll('.ly-hero .hi b').forEach(el => fitText(el, 22, 17));
   fitText(content.querySelector('.hero-cap b'), 54, 30);
+  // 巨型字：宽度自适应（4 个字会缩到 ~165px），缩完把实际字号写给色块垫算高矮
+  const bwBox = content.querySelector('.ly-bigword .bw-box');
+  if (bwBox) {
+    const bwWord = bwBox.querySelector('.bw-word');
+    fitText(bwWord, 210, 110);
+    bwBox.style.setProperty('--wsz', (parseFloat(bwWord.style.fontSize) || 210) + 'px');
+  }
+  content.querySelectorAll('.ly-bigword .bw-title, .ly-band .bd-title').forEach(el => fitText(el, 31, 20));
+  content.querySelectorAll('.ly-band .bd .t b').forEach(el => fitText(el, 30, 20));
 
   chartHost = document.getElementById('chartBox');
   if (chartHost) {
