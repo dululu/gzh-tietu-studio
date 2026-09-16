@@ -35,6 +35,13 @@ do
 done
 [ -n "$CHROME" ] || { echo "没找到 Chrome / Edge / Chromium" >&2; exit 1; }
 
+# 出图那趟已经把体检指标捎回来了（.pages/.dumps/），直接读就行——**一次 Chrome 都不启**。
+if [ -d "$OUT_ABS/.pages/.dumps" ]; then
+  "$NODE_BIN" "$DIR/检查溢出.js" from-dumps "$OUT_ABS"
+  exit $?
+fi
+
+# 没有缓存（页面不是走出图流程生成的）才回退到探针：临时给页面注入度量脚本，再逐张量。
 PROBE_DIR="$("$NODE_BIN" "$DIR/检查溢出.js" prep "$OUT_ABS")" || exit 1
 [ -n "$PROBE_DIR" ] || exit 1
 
