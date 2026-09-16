@@ -152,7 +152,9 @@ function buildPages() {
   rows.forEach((row, i) => {
     // 用「包含 img」而不是「以 img 开头」：quadImgs 这种数组字段开头是 quad，
     // 只匹配 /^img/ 会漏掉，图在 .pages/ 里就全 404（渲染成"缺图"小方块）。
-    Object.keys(row).filter(k => /img/i.test(k)).forEach(k => {
+    // bg 是满幅底图，字段名不含 img，必须单独列出来 —— 漏了它页面不报错，
+    // 底图只是静静地 404（体检里显示"图 0/0 张"），最容易被误读成"探针不认识这个字段"。
+    Object.keys(row).filter(k => /img/i.test(k) || k === 'bg').forEach(k => {
       const label = `${safeName(row.name, i)} 的 ${k}`;
       const v = row[k];
       row[k] = Array.isArray(v)

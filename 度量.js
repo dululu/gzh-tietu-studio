@@ -78,17 +78,22 @@ function parseMetrics(s) {
 /** 这个版式理论上该渲染出几张真图。要和 贴图模板.html 的 LAYOUTS 保持一致：
  *  photo / photoFocus 用 d.img 一张；duo 用 d.img + d.img2 + quadImgs 里非空的项；
  *  hero 是"大图压标题"，同样用 d.img 一张；
- *  其余版式（stat/list/compare/timeline/chart/bar/vs/cards/steps）不看图字段。 */
+ *  满幅外壳（shell:"full"，cover 自动满幅）多一张 bg 底图；
+ *  其余版式（stat/list/compare/timeline/chart/bar/vs/cards/steps）不看图字段。
+ *
+ *  判断条件必须和 render() 里挂 bgImg.src 的那一行**逐字对齐**，
+ *  否则要么漏报（图没出来还说 0/0 通过），要么误报（没有底图却期望 1 张）。 */
 function expectImgs(d) {
   const one = v => (typeof v === 'string' && v.trim() ? 1 : 0);
   const quads = Array.isArray(d.quadImgs)
     ? d.quadImgs.filter(v => typeof v === 'string' && v.trim()).length : 0;
+  const bgN = (d && (d.shell === 'full' || d.layout === 'cover')) ? one(d.bg) : 0;
   switch (d && d.layout) {
     case 'photo':
     case 'photoFocus':
-    case 'hero': return one(d.img);
-    case 'duo': return one(d.img) + one(d.img2) + quads;
-    default: return 0;
+    case 'hero': return bgN + one(d.img);
+    case 'duo': return bgN + one(d.img) + one(d.img2) + quads;
+    default: return bgN;
   }
 }
 

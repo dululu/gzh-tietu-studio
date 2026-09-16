@@ -65,6 +65,30 @@ window.addEventListener('load',function(){setTimeout(function(){
       +' 编号='+cs('.ly-band .bd .n','fontSize')+' 标题='+cs('.ly-band .bd .t b','fontSize')
       +' 零间距='+(bs.length>1?Math.round(bs[1].getBoundingClientRect().top-bs[0].getBoundingClientRect().bottom):'-'));
   }
+  // 满幅外壳：量「白卡真的没了吗、底图真的解码了吗」。
+  // naturalWidth 是关键 —— 只看 src 非空会把 404 的破图也判成"有图"。
+  if(document.querySelector('.poster.full')){
+    var bg=document.getElementById('bgImg');
+    out.push('满幅=是 画布圆角='+cs('.poster','borderRadius')
+      +' 卡底='+cs('.card','backgroundColor')
+      +' 底图='+(bg&&bg.getAttribute('src')?'有':'无')
+      +' 已解码='+(bg&&bg.naturalWidth?bg.naturalWidth+'×'+bg.naturalHeight:'否')
+      +' 淡纱='+cs('.bgveil','display'));
+  }
+  if(document.querySelector('.ly-cover')){
+    var pr3=document.querySelector('.poster').getBoundingClientRect();
+    var kr=document.querySelector('.ly-cover .cv-keys');
+    var k0=kr?kr.getBoundingClientRect():null;
+    out.push('cover大字='+cs('.ly-cover .cv-big','fontSize')+'/'+cs('.ly-cover .cv-big','fontWeight')
+      +' 高亮底='+cs('.ly-cover .cv-big em','boxShadow').slice(0,26)
+      +' 说明='+cs('.ly-cover .cv-note','fontSize')
+      // 数字带要顶到画布边（左 0 右 0），但里面文字仍要对齐在 76px
+      +' 数字带顶边(左/右)='+(k0?Math.round(k0.left-pr3.left):'-')+'/'+(k0?Math.round(pr3.right-k0.right):'-')
+      +' 首块左内边距='+cs('.ly-cover .cv-keys .ck','paddingLeft')
+      +' k字号='+cs('.ly-cover .cv-keys .ck .k','fontSize')
+      +' 块数='+document.querySelectorAll('.ly-cover .cv-keys .ck').length
+      +' 共用标题='+cs('.title','display'));
+  }
   document.title='POSTER '+out.join(' || ')+' END';
 },900)});`;
 

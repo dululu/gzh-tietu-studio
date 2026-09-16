@@ -23,8 +23,10 @@ window.addEventListener('load',function(){setTimeout(function(){
     var r=el.getBoundingClientRect();
     if(r.width===0&&r.height===0)return;
     var cls=(typeof el.className==='string'&&el.className)?el.className.split(' ')[0]:el.tagName;
-    // .bleed = 设计内的满幅出血（巨型字的色块垫、横向色带都左右顶到卡片内边距之外），不算越界
-    if(el.classList&&el.classList.contains('bleed'))return;
+    // .bleed = 设计内的满幅出血（巨型字的色块垫、横向色带、cover 的数字带都顶到卡片内边距之外）。
+    // 用 closest 而不是 contains：出血容器**里面的子元素**同样在卡片外，
+    // 只跳过容器自己会把 .ck / .t 之类全报出来。
+    if(el.closest&&el.closest('.bleed'))return;
     // 容差 2px：倾斜的贴纸和 VS 徽章外环本来就会稍微出血，算设计内
     if(r.bottom>cb.bottom+2||r.right>cb.right+2||r.left<cb.left-2)
       bad.push(cls+'[L'+Math.round(r.left-cb.left)+' R'+Math.round(r.right-cb.right)+' B'+Math.round(r.bottom-cb.bottom)+']');

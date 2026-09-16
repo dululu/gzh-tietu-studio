@@ -112,6 +112,8 @@ const rect = (x, y, w, h, fill, o = {}) =>
   `<rect x="${R(x)}" y="${R(y)}" width="${R(w)}" height="${R(h)}"`
   + (o.rx ? ` rx="${o.rx}"` : '')
   + ` fill="${fill}"`
+  // op 对应 CSS 的 rgba 底色（数字带是 rgba(255,255,255,.9)，要透出底图）
+  + (o.op != null ? ` fill-opacity="${o.op}"` : '')
   + (o.stroke ? ` stroke="${o.stroke}" stroke-width="${o.sw || 0.5}"` : '')
   + (o.dash ? ` stroke-dasharray="${o.dash}"` : '')
   + `/>`;
@@ -204,7 +206,19 @@ function niceScale(max, targetTicks = 6) {
 }
 
 /* ============ 固定件 ============ */
-function background(t) {
+/* 满幅外壳的判定 —— 必须和 贴图模板.html 的 render() 里那两行逐字对齐：
+     const ownShell = d.layout === 'cover';
+     const fullShell = d.shell === 'full' || ownShell;
+   对不上就会出现"PNG 是满幅、SVG 还是白卡"这种静默走形。 */
+const isFullShell = d => !!(d && (d.shell === 'full' || d.layout === 'cover'));
+
+/* 满幅外壳下，出血元素要一直顶到画布边（x = 0 .. W）；
+   不是满幅时仍只是"顶到卡片内边距之外"（26 .. 784）。
+   bigword 的色块垫、band 的色带都要走这里 —— 漏一边就会变成
+   「PNG 顶到 0、SVG 停在 26」这种两边都渲染成功、却悄悄不一样的走形。 */
+const bleedBox = d => (isFullShell(d) ? { x: 0, w: W } : { x: PAD, w: W - PAD * 2 });
+
+function background(t, d) {
   const blob = rgb2hex(t.blobRgb);
   const mist = rgb2hex(t.mistRgb);
   const defs = `<defs>
@@ -224,7 +238,31 @@ function background(t) {
     <stop offset="0.86" stop-color="${mist}" stop-opacity="0.9"/>
     <stop offset="1" stop-color="${mist}" stop-opacity="0"/>
   </linearGradient>
+  <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.94"/>
+    <stop offset="0.22" stop-color="#FFFFFF" stop-opacity="0.70"/>
+    <stop offset="0.44" stop-color="#FFFFFF" stop-opacity="0.28"/>
+    <stop offset="0.66" stop-color="#FFFFFF" stop-opacity="0.24"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.88"/>
+  </linearGradient>
+  <linearGradient id="veilTint" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="${blob}" stop-opacity="0.22"/>
+    <stop offset="1" stop-color="${blob}" stop-opacity="0.14"/>
+  </linearGradient>
 </defs>`;
+
+  // 满幅：不要圆角画布、不要白卡，底图直接铺到四个边。
+  // 淡纱在下、文字在上（background() 是整个 SVG 的第一层，天然压在所有内容下面）。
+  if (isFullShell(d)) {
+    let g = `<g id="背景">` + rect(0, 0, W, H, 'url(#bg)');
+    if (d.bg) {
+      g += imgCard(d.bg, 0, 0, W, H, t, '满幅底图', 'center', 0)
+        + rect(0, 0, W, H, 'url(#veil)')
+        + rect(0, 0, W, H, 'url(#veilTint)');
+    }
+    return defs + g + `</g>`;
+  }
+
   const blobs = [[40, 60], [770, 50], [20, 1020], [800, 1010]]
     .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="230" fill="url(#blob)"/>`).join('');
   return defs
@@ -934,8 +972,9 @@ function contentBigword(d, top, bottom, t) {
 
   let g = `<g id="内容区-巨型字">`;
   if (d.bwTitle) g += T({ x: CX, cy: top + titleH / 2, s: d.bwTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
-  // 满幅色块垫：左右顶到卡片内边距外（PAD .. W-PAD），字的下半段压在它上面
-  g += rect(PAD, boxBottom - 0.40 * ws, W - PAD * 2, 0.34 * ws, t.soft);
+  // 色块垫：左右顶到卡片内边距外；满幅时再往外顶到画布边。字的下半段压在它上面
+  const bw = bleedBox(d);
+  g += rect(bw.x, boxBottom - 0.40 * ws, bw.w, 0.34 * ws, t.soft);
   g += `<g transform="rotate(-3 ${R(cx)} ${R(cy)})">`
     + T({ x: cx, cy, s: wordStr, size: ws, fill: t.card, weight: 900, family: TITLE_FONT, ls: -0.032 * ws });
   if (d.bwUnit) {
@@ -979,6 +1018,7 @@ function contentBand(d, top, bottom, t) {
   const numSize = 76, hSize = 30, pSize = 20, numW = 112, gap = 24;
   const bodyX = CX + numW + gap;
   const bodyAvail = CW - numW - gap;
+  const bx = bleedBox(d);
 
   let g = `<g id="内容区-色带分割">`;
   if (d.bandTitle) g += T({ x: CX, cy: top + titleH / 2, s: d.bandTitle, size: 31, fill: t.title, weight: 700, family: TITLE_FONT, anchor: 'start' });
@@ -988,12 +1028,13 @@ function contentBand(d, top, bottom, t) {
     const tone = b.warn ? 'warn' : (b.tone || (i % 2 === 0 ? 'dark' : 'soft'));
     const bg = tone === 'warn' ? '#CE4038' : tone === 'dark' ? t.card : tone === 'soft' ? t.soft : '#FFFFFF';
     const dark = tone === 'dark' || tone === 'warn';
-    // 色带左右出血到卡片内边距之外，彼此零间距 —— 分割本身就是装饰
-    g += rect(PAD, y, W - PAD * 2, bandH, bg);
+    // 色带左右出血到卡片内边距之外（满幅时一直顶到画布边），彼此零间距 —— 分割本身就是装饰。
+    // 带内文字仍对齐固定位置：不跟着出血走，否则满幅后文字会贴到画布边上。
+    g += rect(bx.x, y, bx.w, bandH, bg);
     if (tone === 'plain') {
       // 对齐 HTML 的 inset box-shadow：上下各一条 2px 细线画在带子内侧
-      g += line(PAD, y + 1, W - PAD, y + 1, t.softLine, 2)
-        + line(PAD, y + bandH - 1, W - PAD, y + bandH - 1, t.softLine, 2);
+      g += line(bx.x, y + 1, bx.x + bx.w, y + 1, t.softLine, 2)
+        + line(bx.x, y + bandH - 1, bx.x + bx.w, y + bandH - 1, t.softLine, 2);
     }
     g += T({ x: CX + numW / 2, cy: y + bandH / 2, s: b.n || String(i + 1).padStart(2, '0'), size: numSize, fill: dark ? '#FFFFFF' : t.card, weight: 900, ls: -4 });
     const hLines = wrapText(b.h || '', hSize, bodyAvail);
@@ -1011,6 +1052,113 @@ function contentBand(d, top, bottom, t) {
   return g + `</g>`;
 }
 
+/* ---- cover：满幅底图 + 左对齐大字 + 底部满幅数字带 ----
+   与 贴图模板.html 的 .ly-cover 一一对应。
+   这里最麻烦的是大字里的 <em>：HTML 靠 box-shadow: inset 做行内底衬，
+   SVG 没有这东西，只能先解析出高亮片段、在文字**下面**铺一条色块，
+   再按片段逐段画字（每段的 x 自己累加，否则高亮块和字对不上）。 */
+function parseEm(str) {
+  const out = [];
+  const re = /<em>([\s\S]*?)<\/em>/g;
+  let last = 0, m;
+  while ((m = re.exec(String(str)))) {
+    if (m.index > last) out.push({ s: String(str).slice(last, m.index), hl: false });
+    out.push({ s: m[1], hl: true });
+    last = m.index + m[0].length;
+  }
+  if (last < String(str).length) out.push({ s: String(str).slice(last), hl: false });
+  return out.filter(x => x.s !== '');
+}
+
+/* 按「片段」折行：返回 [[{s,hl},…], …]，内层数组是一行。
+   字间距要算进宽度 —— 大字用了 -0.01em，漏掉它每行会多算 8px 左右、折行位置就和 PNG 不一样。 */
+function wrapRich(segs, size, avail, ls = 0) {
+  const lines = [];
+  let cur = [], curW = 0;
+  for (const seg of segs) {
+    let buf = '';
+    for (const ch of [...seg.s]) {
+      const w = textW(ch, size) + ls;
+      if (curW + w > avail && (cur.length || buf)) {
+        if (buf) { cur.push({ s: buf, hl: seg.hl }); buf = ''; }
+        lines.push(cur); cur = []; curW = 0;
+      }
+      buf += ch; curW += w;
+    }
+    if (buf) cur.push({ s: buf, hl: seg.hl });
+  }
+  if (cur.length) lines.push(cur);
+  return lines.length ? lines : [[]];
+}
+
+function contentCover(d, top, bottom, t) {
+  const BIG = 82, BLH = 1.16, BLS = -0.01 * BIG;
+  const NOTE = 23, NLH = 1.55, GAP = 22;
+  const KEYGAP = 36, KEYPAD = 22, KH = 40 * 1.1, KVGAP = 6, VH = 18 * 1.4;
+
+  const bigLines = wrapRich(parseEm(d.cvBig || ''), BIG, CW, BLS);
+  const noteLines = d.cvNote ? wrapText(d.cvNote, NOTE, CW) : [];
+  const keys = d.cvKeys || [];
+  const n = keys.length;
+
+  // 数字带按整张画布均分（满幅出血），每列内宽随首末列的内边距不同
+  const colW = n ? W / n : 0;
+  const innerW = i => colW - (i === 0 ? 76 : 24) - (i === n - 1 ? 76 : 24);
+  const keyMeta = keys.map((kv, i) => ({
+    kSize: fitSize(kv.k, 40, innerW(i), 0, 22),
+    vLines: kv.v ? wrapText(kv.v, 18, innerW(i)) : []
+  }));
+  const maxVL = keyMeta.reduce((a, m) => Math.max(a, m.vLines.length), 0);
+  const keyH = n ? KEYPAD * 2 + KH + KVGAP + maxVL * VH : 0;
+
+  const bigH = bigLines.length * BIG * BLH;
+  const noteH = noteLines.length ? GAP + noteLines.length * NOTE * NLH : 0;
+  const keysTop = bottom - keyH;
+  const noteTop = keysTop - (n ? KEYGAP : 0) - noteH;
+  const bigTop = noteTop - bigH;
+
+  let g = `<g id="内容区-满幅封面">`;
+
+  // 顶部小标签：直角小色条 + 一行小字
+  if (d.cvTag) {
+    const tg = fitSize(d.cvTag, 22, CW - 60, 4, 16);
+    g += rect(CX, top + 8, 46, 10, t.badge)
+      + T({ x: CX + 60, cy: top + 13, s: d.cvTag, size: tg, fill: t.title, weight: 700, ls: 4, anchor: 'start' });
+  }
+
+  // 大字：先铺高亮底衬，再逐片段画字
+  bigLines.forEach((ln, li) => {
+    const cy = bigTop + li * BIG * BLH + BIG * BLH / 2;
+    let x = CX;
+    for (const seg of ln) {
+      const w = textW(seg.s, BIG) + BLS * seg.s.length;
+      if (seg.hl) g += rect(x, cy + BIG * 0.36 - 16, w, 16, t.soft);
+      g += T({ x, cy, s: seg.s, size: BIG, fill: seg.hl ? t.card : t.title, weight: 900, family: TITLE_FONT, ls: BLS, anchor: 'start' });
+      x += w;
+    }
+  });
+
+  noteLines.forEach((ln, i) => {
+    g += T({ x: CX, cy: noteTop + i * NOTE * NLH + NOTE * NLH / 2, s: ln, size: NOTE, fill: t.axis, anchor: 'start' });
+  });
+
+  // 数字带：左右顶到画布边（x = 0..810），里面的文字仍对齐 76px
+  let x = 0;
+  keys.forEach((kv, i) => {
+    const m = keyMeta[i], warn = !!kv.warn;
+    g += rect(x, keysTop, colW, keyH, warn ? '#FCEDEA' : '#FFFFFF', { op: warn ? 1 : 0.9 })
+      + rect(x, keysTop, 5, keyH, warn ? '#CE4038' : t.badge);
+    const tx = x + (i === 0 ? 76 : 24);
+    g += T({ x: tx, cy: keysTop + KEYPAD + KH / 2, s: kv.k, size: m.kSize, fill: warn ? '#CE4038' : t.card, weight: 800, anchor: 'start' });
+    m.vLines.forEach((ln, k) => {
+      g += T({ x: tx, cy: keysTop + KEYPAD + KH + KVGAP + k * VH + VH / 2, s: ln, size: 18, fill: t.axis, anchor: 'start' });
+    });
+    x += colW;
+  });
+
+  return g + `</g>`;
+}
+
 const CONTENT = {
   vs: contentVs,
   cards: contentCards,
@@ -1018,6 +1166,7 @@ const CONTENT = {
   hero: contentHero,
   bigword: contentBigword,
   band: contentBand,
+  cover: contentCover,
   photo: contentPhoto,
   photoFocus: contentFocus,
   duo: contentDuo,
@@ -1034,7 +1183,11 @@ const unknownLayouts = new Set();
 
 function buildSVG(d) {
   const t = THEMES[d.theme] || THEMES.blue;
-  const tb = titleBlock(d, t);
+  // cover 自带整版排版（顶部小标签 + 大字 + 底部数字带），不共用顶部双行标题。
+  // 传 bottom = CARD_TOP - 26，让下面算出来的 top 正好落在 CARD_TOP（76），
+  // 和 HTML 里 .poster.own-title .content { margin-top: 0 } 对齐。
+  const ownShell = d.layout === 'cover';
+  const tb = ownShell ? { svg: '', bottom: CARD_TOP - 26 } : titleBlock(d, t);
   const fb = footBlock(d, t);
   const top = tb.bottom + 26;
   const bottom = fb.top - 18;
@@ -1045,7 +1198,7 @@ function buildSVG(d) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-${background(t)}
+${background(t, d)}
 ${badge(d.badge, t)}
 ${tb.svg}
 ${body}

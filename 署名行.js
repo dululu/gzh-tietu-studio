@@ -40,7 +40,8 @@ function parseArgs(argv) {
 }
 
 // 递归收集 JSON 里所有像图片路径的字符串。
-// 只在「键名含 img」的分支里收，避免误抓 foot 正文里出现的文件名。
+// 只在「键名含 img」的分支里收，避免误抓 foot 正文里出现的文件名；
+// bg 是满幅底图，键名不含 img，得单独列出来 —— 漏了它脚注会静默少一个来源。
 // 标志位要跟着往下传：quadImgs 是字符串数组，如果只在键那一层判断，
 // 数组里的元素永远收不到（第一版就是这么漏掉四宫格图的）。
 function collectImages(node, acc, inImg) {
@@ -51,7 +52,7 @@ function collectImages(node, acc, inImg) {
   if (Array.isArray(node)) { node.forEach((n) => collectImages(n, acc, inImg)); return; }
   if (node && typeof node === 'object') {
     for (const [k, v] of Object.entries(node)) {
-      collectImages(v, acc, inImg || /img/i.test(k));
+      collectImages(v, acc, inImg || /img/i.test(k) || k === 'bg');
     }
   }
 }
@@ -73,6 +74,9 @@ function licInfo(raw) {
   const t = (raw || '').trim();
   if (!t) return { fam: '?' };
   if (OWN_RE.test(t)) return { fam: 'OWN' };
+  // AI 生成图没有第三方权利人，也不是 CC 许可。必须排在 CC 匹配之前，
+  // 否则台账里「AI 生成（无第三方授权约束）」这行会掉进「许可待核」。
+  if (/AI\s*生成|AI[- ]?generated|人工智能生成/i.test(t)) return { fam: 'AI' };
   // Pexels 不是 CC 许可，是一套自有条款：可商用、免署名（建议标）。
   // 必须放在 CC 匹配之前，否则 "Pexels 许可" 这类写法会掉进「许可待核」。
   if (/pexels/i.test(t)) return { fam: 'PEX' };
@@ -102,7 +106,7 @@ function renderPage(page, ledger, maxAuthors) {
   if (uniq.length === 0) return { lines: ['（本页无配图，脚注只留数据来源）'], bad: false };
 
   const authors = [];
-  const byVer = []; const bysaVer = []; let cc0 = false; let pd = false; let own = 0; let pexels = 0;
+  const byVer = []; const bysaVer = []; let cc0 = false; let pd = false; let own = 0; let pexels = 0; let aiGen = 0;
   const unregistered = []; const unknownLic = [];
 
   for (const f of uniq) {
@@ -110,6 +114,7 @@ function renderPage(page, ledger, maxAuthors) {
     if (!row) { unregistered.push(f); continue; }
     const li = licInfo(row.license);
     if (li.fam === 'OWN') { own++; continue; }
+    if (li.fam === 'AI') { aiGen++; continue; }
     if (li.fam === 'PEX') { pexels++; continue; }
     const a = row.author.replace(/^——$/, '').trim();
     if (a && !authors.includes(a)) authors.push(a);
@@ -127,12 +132,20 @@ function renderPage(page, ledger, maxAuthors) {
   }
   if (own) source.push(`自有素材${own > 1 ? ` ${own} 张` : ''}`);
   if (pexels) source.push(`Pexels${pexels > 1 ? ` ${pexels} 张` : ''}`);
+  // AI 底图按项目口径一律标「示意图」：读者得知道这不是某个真实场景的照片
+  if (aiGen) source.push(`AI 生成底图${aiGen > 1 ? ` ${aiGen} 张` : ''}（示意图）`);
 
   const licParts = [];
   if (byVer.length) licParts.push(`CC BY ${sortVer(byVer).join('/')}`);
   if (bysaVer.length) licParts.push(`CC BY-SA ${sortVer(bysaVer).join('/')}`);
   if (cc0) licParts.push('CC0');
   if (pd) licParts.push('公有领域');
+  // AI 这条不并进上面的「或」里：一页同时有 CC 图和 AI 底图时，两个事实都要在。
+  // 只有在别的许可都没有时才省掉「AI 底图」四个字，否则整行会出现两次「AI 生成」。
+  if (aiGen) {
+    const otherLic = byVer.length || bysaVer.length || cc0 || pd || pexels || own;
+    licParts.push(otherLic ? 'AI 底图无第三方著作权' : '无第三方著作权');
+  }
   if (unknownLic.length) licParts.push('许可待核');
   // 整页只有 Pexels / 自有素材时，许可段会空着，补一句说明
   if (!licParts.length && pexels) licParts.push('Pexels 许可（可商用、免署名）');
@@ -172,13 +185,16 @@ function main() {
     return;
   }
 
-  // 台账查找顺序：显式指定 → 数据源同目录 → 数据源上级目录 → 当前工作目录
+  // 台账查找顺序：显式指定 → 数据源同目录 → 数据源上级目录 → 当前工作目录。
+  // 两个文件名都认：「配图署名.md」是项目里的惯例，「CREDITS.md」是技能包 examples/ 里的叫法
+  //（README 把它当台账，早先脚本只找前者，于是包内跑起来全部标「未登记」）。
   const dir = path.dirname(dataPath);
+  const NAMES = ['配图署名.md', 'CREDITS.md'];
   const candidates = [
     args.ledger,
-    path.join(dir, '配图署名.md'),
-    path.join(dir, '..', '配图署名.md'),
-    path.join(process.cwd(), '配图署名.md'),
+    ...NAMES.map((n) => path.join(dir, n)),
+    ...NAMES.map((n) => path.join(dir, '..', n)),
+    ...NAMES.map((n) => path.join(process.cwd(), n)),
   ].filter(Boolean);
   let ledgerPath = null;
   for (const c of candidates) {
@@ -190,7 +206,7 @@ function main() {
     ledger = parseLedger(fs.readFileSync(ledgerPath, 'utf8'));
     console.error(`台账：${ledgerPath}（已登记 ${ledger.size} 张）`);
   } else {
-    console.error('警告：没找到配图署名台账，所有图都会标成「未登记」。');
+    console.error('警告：没找到署名台账（配图署名.md / CREDITS.md），所有图都会标成「未登记」。');
   }
 
   const blocks = [];

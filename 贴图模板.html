@@ -43,6 +43,40 @@
     display: flex; flex-direction: column;
   }
 
+  /* ================= 满幅外壳（数据里写 "shell": "full"） =================
+     拆掉白卡：卡面透明。**内容的位置和边距一律不动**，所以布局与溢出检查
+     完全不受影响，变的只是「背景」这一层 —— 底图铺满整张画布，文字直接压在图上。
+     默认不开；不开时老版式的渲染结果一个字节都不变。
+
+     两个开关分开，是为了让「满幅」能独立于「有没有底图」使用：
+       shell:"full"          → 白卡消失，主题底色满幅（无底图的纯净满幅）
+       shell:"full" + bg     → 底图铺满 + 主题色淡纱（有图时才挂 hasbg） */
+  .bgimg, .bgveil { display: none; }
+  .poster.full.hasbg .bgimg {
+    display: block; position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover; object-position: center;
+  }
+  .poster.full.hasbg .bgveil {
+    display: block; position: absolute; inset: 0; pointer-events: none;
+    /* 上白下白、中间透：共用的标题在顶部、脚注在底部，都要读得清 */
+    background:
+      linear-gradient(180deg,
+        rgba(255,255,255,.94) 0%, rgba(255,255,255,.70) 22%,
+        rgba(255,255,255,.28) 44%, rgba(255,255,255,.24) 66%,
+        rgba(255,255,255,.88) 100%),
+      linear-gradient(180deg, rgba(var(--blob), .22) 0%, rgba(var(--blob), .14) 100%);
+  }
+  /* 满幅是海报不是卡片：去圆角、去卡面 */
+  .poster.full { border-radius: 0; }
+  .poster.full .card { background: transparent; box-shadow: none; }
+  /* 满幅时四角光晕会糊在照片上，交给上面的淡纱统一处理 */
+  .poster.full::after { display: none; }
+
+  /* 满幅时出血元素一直顶到画布边（卡内边距 50 + 卡外边距 26 = 76），文字位置不变。
+     这是「满幅」真正值钱的地方：色带/色块垫从 26px 处再往外顶到 0，才是满幅海报。 */
+  .poster.full .ly-band .bd { margin-left: -76px; margin-right: -76px; padding-left: 76px; padding-right: 76px; }
+  .poster.full .ly-bigword .bw-pad { left: -76px; right: -76px; }
+
   /* ---------- 固定件 1：右上角账号角标 ---------- */
   .badge {
     position: absolute; top: 0; right: 0; z-index: 9;
@@ -502,6 +536,45 @@
   .ly-band .bd.warn .t p { color: rgba(255,255,255,.9); }
 
   /* ---------- 固定件 4：底部来源 ---------- */
+  /* ---------- cover：满幅底图 + 左对齐大字 + 底部满幅数字带 ----------
+     这是「拆白卡」的完整形态：不共用顶部双行标题，整张画布自己排。
+     靠 .own-title 藏掉 .title / .deck，把 .content 从 CARD_TOP 一路放开到脚注。 */
+  .poster.own-title .title,
+  .poster.own-title .deck { display: none; }
+  .poster.own-title .content { margin-top: 0; }
+
+  .ly-cover { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ly-cover .cv-tag {
+    flex: none; display: flex; align-items: center; gap: 14px;
+    font-size: 22px; font-weight: 700; letter-spacing: 4px; color: var(--title);
+  }
+  /* 直角小色条，沿用「直角色块 > 药丸」那一条 */
+  .ly-cover .cv-tag::before { content: ""; width: 46px; height: 10px; background: var(--badge); }
+  .ly-cover .cv-gap { flex: 1; min-height: 0; }
+  .ly-cover .cv-big {
+    flex: none;
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+    font-weight: 900; font-size: 82px; line-height: 1.16; letter-spacing: -.01em;
+    color: var(--title);
+  }
+  /* 行内高亮用 inset 阴影而不是 background —— background 会把行高撑开、两行会错位 */
+  .ly-cover .cv-big em { font-style: normal; color: var(--card); box-shadow: inset 0 -16px 0 var(--soft); }
+  .ly-cover .cv-note { flex: none; margin-top: 22px; font-size: 23px; line-height: 1.55; color: var(--axis); }
+  /* 数字带左右各出血 76px 直顶画布边（文字仍对齐在 76px），是满幅海报的收口 */
+  .ly-cover .cv-keys { flex: none; margin: 36px -76px 0; display: flex; }
+  .ly-cover .cv-keys .ck {
+    flex: 1; min-width: 0; padding: 22px 24px;
+    background: rgba(255, 255, 255, .9);
+    border-left: 5px solid var(--badge);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .ly-cover .cv-keys .ck:first-child { padding-left: 76px; }
+  .ly-cover .cv-keys .ck:last-child { padding-right: 76px; }
+  .ly-cover .cv-keys .ck.warn { background: #FCEDEA; border-left-color: #CE4038; }
+  .ly-cover .cv-keys .ck .k { font-size: 40px; font-weight: 800; line-height: 1.1; color: var(--card); }
+  .ly-cover .cv-keys .ck.warn .k { color: #CE4038; }
+  .ly-cover .cv-keys .ck .v { font-size: 18px; line-height: 1.4; color: var(--axis); }
+
   .footnote { flex: none; margin-top: 18px; font-size: 16px; line-height: 1.8; color: var(--foot); }
   .footnote.empty { display: none; }
 
@@ -529,6 +602,8 @@
 <body>
 
 <div class="poster" id="poster">
+  <img class="bgimg" id="bgImg" alt="">
+  <div class="bgveil" id="bgVeil"></div>
   <div class="badge" id="badgeBox"></div>
   <div class="card">
     <div class="title">
@@ -561,6 +636,7 @@
       <option value="hero">大图压标题 + 要点条</option>
       <option value="bigword">巨型字主视觉（字压色块）</option>
       <option value="band">横向色带分割（满幅撞色）</option>
+      <option value="cover">满幅封面（底图压大字）</option>
     </select>
     <select id="themePick"></select>
     <span class="swatches" id="swatches"></span>
@@ -762,6 +838,18 @@ const LAYOUTS = {
           <span class="n">${b.n || String(i + 1).padStart(2, '0')}</span>
           <div class="t"><b>${b.h || ''}</b>${b.p ? `<p>${b.p}</p>` : ''}</div>
         </div>`).join('')}</div>
+    </div>`,
+
+  /* cover 自带整版排版（见 render 里的 own-title）：
+     顶部小标签 → 弹簧 → 大字 → 说明 → 底部满幅数字带。
+     大字里可以用 <em> 做行内高亮（直角底衬，不跟字号缩放）。 */
+  cover: d => `<div class="ly-cover">
+      ${d.cvTag ? `<div class="cv-tag">${d.cvTag}</div>` : ''}
+      <div class="cv-gap"></div>
+      <div class="cv-big">${d.cvBig || ''}</div>
+      ${d.cvNote ? `<div class="cv-note">${d.cvNote}</div>` : ''}
+      ${(d.cvKeys || []).length ? `<div class="cv-keys bleed">${d.cvKeys.map(k => `
+        <div class="ck${k.warn ? ' warn' : ''}"><span class="k">${k.k || ''}</span><span class="v">${k.v || ''}</span></div>`).join('')}</div>` : ''}
     </div>`
 };
 
@@ -904,6 +992,17 @@ function render(injected) {
   const themeName = THEMES[d.theme] ? d.theme : DEFAULT_THEME;
   const t = applyTheme(themeName);
 
+  // 满幅外壳：先定壳、再灌内容。cover 自带整版排版，强制满幅并藏掉共用的双行标题。
+  // 老版式默认 shell:"card"，这一整段对它们不产生任何影响。
+  const posterEl = document.getElementById('poster');
+  const ownShell = d.layout === 'cover';
+  const fullShell = d.shell === 'full' || ownShell;
+  posterEl.classList.toggle('full', fullShell);
+  posterEl.classList.toggle('own-title', ownShell);
+  posterEl.classList.toggle('hasbg', fullShell && !!d.bg);
+  const bgImg = document.getElementById('bgImg');
+  if (fullShell && d.bg) bgImg.src = d.bg; else bgImg.removeAttribute('src');
+
   const bs = String(d.badge || '小铭想');
   const bb = document.getElementById('badgeBox');
   // 第一字单独一行，剩下的字放第二行（角标只有 88px 宽，字数多就缩字号）
@@ -948,6 +1047,11 @@ function render(injected) {
   }
   content.querySelectorAll('.ly-bigword .bw-title, .ly-band .bd-title').forEach(el => fitText(el, 31, 20));
   content.querySelectorAll('.ly-band .bd .t b').forEach(el => fitText(el, 30, 20));
+  // cover：大字按自然折行排（不 fitText，否则会被当成单行压到下限），
+  // 所以 cvBig 有字数红线，超了由越界探针兜底报出来；其余单行元素照常缩。
+  fitText(content.querySelector('.ly-cover .cv-tag'), 22, 16);
+  content.querySelectorAll('.ly-cover .cv-keys .ck .k').forEach(el => fitText(el, 40, 22));
+  content.querySelectorAll('.ly-cover .cv-keys .ck .v').forEach(el => fitText(el, 18, 12));
 
   chartHost = document.getElementById('chartBox');
   if (chartHost) {
