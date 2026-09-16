@@ -199,9 +199,20 @@ function main() {
     const r = renderPage(page, ledger, args.maxAuthors);
     if (r.bad) bad++;
     const w = r.main ? widthOf(r.main) : 0;
-    const hint = r.main
-      ? `\n   （约 ${w} 字宽 / 一行上限 41${w > 41 ? ' —— 超了，砍作者或用 --作者上限 1' : ''}）`
-      : '';
+    let hint = r.main ? `\n   （约 ${w} 字宽 / 一行上限 41）` : '';
+    // 超一行时别只报错：把作者一个个砍下去，给出第一个放得下的版本。
+    // 图多的页（duo 六张图）默认 --作者上限 2 很容易超，这行提示能省一轮来回。
+    if (r.main && w > 41 && args.maxAuthors >= 2) {
+      let fit = null;
+      for (let k = 1; k < args.maxAuthors; k++) {
+        const alt = renderPage(page, ledger, k);
+        if (alt.main && widthOf(alt.main) <= 41) { fit = { k, line: alt.main, w: widthOf(alt.main) }; break; }
+      }
+      hint = `\n   （约 ${w} 字宽 / 一行上限 41 —— 超了）`;
+      hint += fit
+        ? `\n   ↳ 收窄作者即可放进一行（--作者上限 ${fit.k}，${fit.w} 字宽）：\n     ${fit.line}`
+        : `\n   ↳ 砍作者也放不下，改短作者名，或把这行挪到 secondFoot / 拆成两行。`;
+    }
     blocks.push(`── ${page.name || '(未命名)'} ──\n${r.lines.join('\n')}${hint}`);
   }
 
