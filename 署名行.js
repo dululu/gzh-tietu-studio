@@ -73,6 +73,9 @@ function licInfo(raw) {
   const t = (raw || '').trim();
   if (!t) return { fam: '?' };
   if (OWN_RE.test(t)) return { fam: 'OWN' };
+  // Pexels 不是 CC 许可，是一套自有条款：可商用、免署名（建议标）。
+  // 必须放在 CC 匹配之前，否则 "Pexels 许可" 这类写法会掉进「许可待核」。
+  if (/pexels/i.test(t)) return { fam: 'PEX' };
   if (/CC0/i.test(t)) return { fam: 'CC0' };
   if (/public\s*domain|公有领域|\bPD\b/i.test(t)) return { fam: 'PD' };
   const m = t.match(/CC\s*BY(-SA)?\s*([\d.]+)?/i);
@@ -99,7 +102,7 @@ function renderPage(page, ledger, maxAuthors) {
   if (uniq.length === 0) return { lines: ['（本页无配图，脚注只留数据来源）'], bad: false };
 
   const authors = [];
-  const byVer = []; const bysaVer = []; let cc0 = false; let pd = false; let own = 0;
+  const byVer = []; const bysaVer = []; let cc0 = false; let pd = false; let own = 0; let pexels = 0;
   const unregistered = []; const unknownLic = [];
 
   for (const f of uniq) {
@@ -107,6 +110,7 @@ function renderPage(page, ledger, maxAuthors) {
     if (!row) { unregistered.push(f); continue; }
     const li = licInfo(row.license);
     if (li.fam === 'OWN') { own++; continue; }
+    if (li.fam === 'PEX') { pexels++; continue; }
     const a = row.author.replace(/^——$/, '').trim();
     if (a && !authors.includes(a)) authors.push(a);
     if (li.fam === 'BY') byVer.push(li.ver);
@@ -122,6 +126,7 @@ function renderPage(page, ledger, maxAuthors) {
     source.push(`维基共享资源 · ${shown.join('、')}${authors.length > shown.length ? ' 等' : ''}`);
   }
   if (own) source.push(`自有素材${own > 1 ? ` ${own} 张` : ''}`);
+  if (pexels) source.push(`Pexels${pexels > 1 ? ` ${pexels} 张` : ''}`);
 
   const licParts = [];
   if (byVer.length) licParts.push(`CC BY ${sortVer(byVer).join('/')}`);
@@ -129,6 +134,9 @@ function renderPage(page, ledger, maxAuthors) {
   if (cc0) licParts.push('CC0');
   if (pd) licParts.push('公有领域');
   if (unknownLic.length) licParts.push('许可待核');
+  // 整页只有 Pexels / 自有素材时，许可段会空着，补一句说明
+  if (!licParts.length && pexels) licParts.push('Pexels 许可（可商用、免署名）');
+  if (!licParts.length && own) licParts.push('自有素材，无第三方署名要求');
 
   let line = `配图：${source.length ? source.join('；') : '（未登记）'}`;
   if (licParts.length) line += `；${licParts.join('，')}`;
